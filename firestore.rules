@@ -11,6 +11,7 @@ service cloud.firestore {
       // Product mutation goes through authenticated server APIs.
       allow write: if false;
     }
+    match /promotions/{promotionId} { allow read: if resource.data.active == true || staffMember(); allow write: if false; }
     match /staff/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;

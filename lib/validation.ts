@@ -25,3 +25,5 @@ export const orderSchema = z.object({
   if(data.customer.method === "Entrega" && data.customer.address.length < 8) ctx.addIssue({ code: "custom", message: "Indica una dirección de entrega", path: ["customer","address"] });
 });
 export const statuses = ["Nuevo","Confirmado","Preparando","Listo","Entregado","Cancelado"] as const;
+
+export const promotionSchema = z.object({id:z.string().min(2).max(80).regex(/^[a-z0-9-]+$/),title:z.string().trim().min(3).max(100),subtitle:z.string().trim().max(240),eyebrow:z.string().trim().min(2).max(40),image:z.string().url().max(2000).refine(v=>v.startsWith("https://")),ctaLabel:z.string().trim().min(2).max(40),active:z.boolean()});

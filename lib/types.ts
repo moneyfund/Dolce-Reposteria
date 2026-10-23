@@ -25,5 +25,6 @@ export type Order = {
   status: OrderStatus;
   createdAt: string;
 };
+export type Promotion = { id: string; title: string; subtitle: string; eyebrow: string; image: string; ctaLabel: string; active: boolean };
 export const categories = ["Todos", "Pasteles", "Cupcakes", "Postres", "Panadería", "Detalles"] as const;
 export const currency = (amount: number) => new Intl.NumberFormat("es-NI", { style: "currency", currency: "NIO", maximumFractionDigits: 0 }).format(amount);

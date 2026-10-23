@@ -1,4 +1,4 @@
-import type { Product, Order } from "@/lib/types";
+import type { Product, Order, Promotion } from "@/lib/types";
 export const demoProducts: Product[] = [
   { id: "torta-rosa", name: "Pastel de fresas", category: "Pasteles", description: "Bizcocho suave, crema delicada y fresas frescas.", price: 850, image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=1000&auto=format&fit=crop&q=85", badge: "Favorito", featured: true, active: true, stock: 12 },
   { id: "torta-chocolate", name: "Sueño de chocolate", category: "Pasteles", description: "Capas de cacao intenso y ganache sedosa.", price: 920, image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=1000&auto=format&fit=crop&q=85", badge: "Más pedido", featured: true, active: true, stock: 9 },
@@ -14,3 +14,5 @@ export const demoOrders: Order[] = [
   { id: "DLC-1027", customer: { name: "Carlos Ruiz", phone: "8888-5678", address: "Matagalpa, centro", method: "Entrega", requestedDate: "2026-10-24" }, items: [{ productId: "cupcake-vainilla", name: "Cupcakes de vainilla", price: 380, quantity: 2 }], subtotal: 760, deliveryFee: 0, total: 760, notes: "", status: "Preparando", createdAt: "2026-10-22T14:05:00-06:00" },
   { id: "DLC-1026", customer: { name: "Sofía Martínez", phone: "8888-9012", address: "", method: "Retiro" }, items: [{ productId: "cheesecake", name: "Cheesecake de frutos rojos", price: 520, quantity: 1 }], subtotal: 520, deliveryFee: 0, total: 520, notes: "", status: "Entregado", createdAt: "2026-10-21T11:00:00-06:00" },
 ];
+
+export const demoPromotions: Promotion[] = [{id:"momento-dolce",title:"Una dulce excusa para celebrar",subtitle:"Descubre sabores que convierten cualquier día en una ocasión especial.",eyebrow:"EDICIÓN ESPECIAL",image:"https://images.unsplash.com/photo-1542826438-bd32f43d626f?w=1200&auto=format&fit=crop&q=85",ctaLabel:"Descubrir delicias",active:true}];

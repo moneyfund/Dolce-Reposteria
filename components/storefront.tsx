@@ -2,9 +2,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowDownRight, ArrowLeft, ArrowRight, Check, ChevronDown, Heart, Instagram, Menu, Minus, Plus, Search, ShoppingBag, Sparkles, Star, Trash2, X } from "lucide-react";
-import { categories, currency, type CartItem, type Category, type Product, type DeliveryMethod, type Order } from "@/lib/types";
-import { demoProducts } from "@/lib/demo";
-import { demoMode, getDemoOrders, getDemoProducts, saveDemoOrders } from "@/lib/demo-storage";
+import { categories, currency, type CartItem, type Category, type Product, type DeliveryMethod, type Order, type Promotion } from "@/lib/types";
+import { demoProducts, demoPromotions } from "@/lib/demo";
+import { demoMode, getDemoOrders, getDemoProducts, getDemoPromotions, saveDemoOrders } from "@/lib/demo-storage";
 const CART_KEY = "dolce-cart-v1";
 const heroImage = "https://images.unsplash.com/photo-1464305795204-6f5bbfc7fb81?w=1400&auto=format&fit=crop&q=88";
 const detailImage = "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=1200&auto=format&fit=crop&q=85";
@@ -23,6 +23,7 @@ function ProductCard({ product, onAdd, index }: { product: Product; onAdd: (p: P
 }
 export default function Storefront() {
   const [products,setProducts] = useState<Product[]>(demoProducts);
+  const [promotions,setPromotions] = useState<Promotion[]>(demoPromotions);
   const [category,setCategory] = useState<string>("Todos");
   const [search,setSearch] = useState("");
   const [cart,setCart] = useState<CartItem[]>([]);
@@ -39,11 +40,11 @@ export default function Storefront() {
     try { const stored=localStorage.getItem(CART_KEY); if(stored) setCart(JSON.parse(stored) as CartItem[]); } catch {}
     setReady(true);
     if(demoMode) {
-      const sync=()=>setProducts(getDemoProducts().filter(p=>p.active));
+      const sync=()=>{setProducts(getDemoProducts().filter(p=>p.active));setPromotions(getDemoPromotions().filter(p=>p.active));};
       sync(); window.addEventListener("dolce-demo-change",sync);
       return ()=>window.removeEventListener("dolce-demo-change",sync);
     }
-    fetch("/api/catalog",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error("No disponible");return r.json();}).then(d=>setProducts(d.products)).catch(()=>setError("No se pudo actualizar el catálogo."));
+    fetch("/api/catalog",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error("No disponible");return r.json();}).then(d=>{setProducts(d.products);setPromotions(d.promotions||[]);}).catch(()=>setError("No se pudo actualizar el catálogo."));
   },[]);
   useEffect(()=>{ if(ready) localStorage.setItem(CART_KEY,JSON.stringify(cart)); },[cart,ready]);
   const visible = useMemo(()=> products.filter(p => (category==="Todos" || p.category===category) && (p.name+" "+p.description).toLocaleLowerCase("es").includes(search.toLocaleLowerCase("es"))),[products,category,search]);
@@ -84,7 +85,7 @@ export default function Storefront() {
     <header className="site-header">
       <a className="brand" href="#inicio" onClick={navigate}><span className="brand-mark">✳</span><span>dolce<span className="brand-dot">.</span><small>REPOSTERÍA</small></span></a>
       <nav className={mobileOpen?"nav-links open":"nav-links"} aria-label="Navegación principal">
-        <a href="#inicio" onClick={navigate}>Inicio</a><a href="#catalogo" onClick={navigate}>Delicias</a><a href="#especial" onClick={navigate}>Momentos especiales</a>
+        <a href="#inicio" onClick={navigate}>Inicio</a><a href="#catalogo" onClick={navigate}>Delicias</a><a href="#promociones" onClick={navigate}>Especiales</a>
       </nav>
       <div className="header-actions"><a href="#catalogo" className="header-order">Explorar menú <ArrowRight size={15}/></a><button className="cart-trigger" type="button" aria-label={"Abrir carrito, "+count+" productos"} onClick={()=>setCartOpen(true)}><ShoppingBag size={20}/>{count>0&&<span className="cart-count">{count}</span>}</button><button className="mobile-menu" type="button" aria-label="Abrir menú" onClick={()=>setMobileOpen(!mobileOpen)}>{mobileOpen?<X size={23}/>:<Menu size={23}/>}</button></div>
     </header>
@@ -107,6 +108,7 @@ export default function Storefront() {
       {visible.length ? <div className="product-grid">{visible.map((product,index)=><ProductCard key={product.id} product={product} onAdd={add} index={index}/>)}</div>:<div className="empty-results"><Sparkles size={30}/><h3>No encontramos ese antojo</h3><p>Prueba con otra categoría o palabra.</p><button onClick={()=>{setSearch("");setCategory("Todos");}}>Ver todos</button></div>}
       <div className="catalog-end"><span>Hechos para compartir, creados para recordar.</span><span>♥</span></div>
     </section>
+    <section id="promociones" className="promo-section section-shell">{promotions.length>0&&<><div className="promo-header"><span className="eyebrow"><span className="eyebrow-line"/> ALGO ESPECIAL PARA TI</span><span>Selecciones de temporada ✳</span></div><div className="promo-grid">{promotions.map(promo=><motion.article {...reveal} className="promo-tile" key={promo.id}><img src={promo.image} alt={promo.title} loading="lazy"/><div className="promo-shade"/><div className="promo-tile-copy"><span>{promo.eyebrow}</span><h2>{promo.title}</h2><p>{promo.subtitle}</p><a href="#catalogo">{promo.ctaLabel} <ArrowRight size={17}/></a></div></motion.article>)}</div></>}</section>
     <section id="especial" className="special"><motion.div {...reveal} className="special-image"><img src={detailImage} alt="Selección de postres artesanales" loading="lazy"/><div className="special-seal">DOLCE<br/>♥<br/>MOMENTS</div></motion.div><motion.div {...reveal} className="special-copy"><span className="eyebrow"><span className="eyebrow-line"/> PARA TUS MOMENTOS</span><h2>Hay momentos que merecen <em>algo único.</em></h2><p>Cumpleaños, celebraciones o un simple «porque sí». Cuéntanos tu idea y hagamos que suceda.</p><a href="#catalogo" className="button-dark">Encontrar mi dulce <ArrowRight size={18}/></a><span className="special-decoration">✳</span></motion.div></section>
     <section className="closing-cta"><span className="eyebrow eyebrow-light">EL PLACER DE LO ARTESANAL</span><h2>Endulcemos tu <em>próximo momento.</em></h2><button onClick={()=>setCartOpen(true)} className="button-primary">Ver mi pedido <ShoppingBag size={18}/></button></section>
     <footer className="footer"><div className="footer-top"><a href="#inicio" className="footer-brand">dolce<span>.</span></a><span>Repostería hecha con amor, en Matagalpa.</span><a href="/admin" className="footer-admin">Acceso al equipo <ArrowRight size={14}/></a></div><div className="footer-bottom"><span>© {new Date().getFullYear()} DOLCE Repostería</span><span>El ingrediente secreto siempre es el cariño ♥</span></div></footer>
