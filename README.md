@@ -49,3 +49,18 @@ Este desarrollo constituye un prototipo funcional de transferencia digital para 
 3. En Vercel configura `FIREBASE_CLIENT_EMAIL` y `FIREBASE_PRIVATE_KEY` directamente desde una cuenta de servicio de Firebase, sin compartir el archivo JSON o la clave por chat.
 4. Publica las reglas del repositorio y comprueba en Manager la lectura pública de Firestore.
 5. Una vez revisadas las operaciones con datos reales, configura `NEXT_PUBLIC_DOLCE_LIVE_MODE=true` y vuelve a desplegar.
+
+## Storage: fotografías y adjuntos
+
+Publica `storage.rules` manualmente en Firebase Console > Storage > Reglas. Estas reglas no se publican automáticamente al hacer push a GitHub.
+
+Rutas admitidas:
+- `catalog/products/{productId}/{fileName}`: imágenes públicas del catálogo, carga/edición/borrado solo por usuarios con `staff/{uid}.role` en `owner` o `admin`.
+- `catalog/promotions/{promotionId}/{fileName}`: banners públicos, edición solo por equipo autorizado.
+- `order-references/{orderId}/{fileName}`: referencias privadas de personalización, solo equipo autorizado. Cargas de clientes sin iniciar sesión **todavía no habilitadas**.
+
+Subidas: JPEG, PNG o WebP de hasta 8 MiB. El panel de esta versión todavía utiliza campos de URL para las imágenes; la carga directa al bucket requiere conectar el formulario de upload a Firebase Storage.
+
+Las reglas consultan roles desde Firestore; al publicarlas, la consola de Firebase puede solicitar autorizar la vinculación IAM entre Storage y Firestore. Verifica los permisos antes de hacer pruebas. Los enlaces de descarga públicos con token deben tratarse como compartibles aunque posteriormente se oculte un producto.
+
+Las imágenes privadas de pedidos no deben exponerse a través de enlaces de descarga permanentes sin un mecanismo de autorización adicional.
