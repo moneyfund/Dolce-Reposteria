@@ -5,7 +5,7 @@ Tienda pública + DOLCE Manager para DOLCE Repostería. Next.js 15, React 19, Ty
 ## Incluido en la primera versión
 
 - Tienda editorial responsive: categorías, búsqueda, catálogo, carrito persistente, modalidad entrega/retiro, fecha, dedicatoria y registro de pedidos.
-- Dashboard (/admin): métricas, gráfico semanal, pedidos con cambios de estado, clientes y gestión de productos/stock.
+- Dashboard (/admin): métricas, gráfico semanal, pedidos con cambios de estado, clientes y gestión de productos/stock y campañas promocionales editables.
 - Backend: API de pedidos que valida precios e inventario en servidor con Firestore y transacciones. API de administración protegida con Firebase Authentication y rol de personal.
 - Demo sin Firebase: catálogo, pedidos y edición local en el navegador. **No son pedidos reales**.
 
@@ -30,7 +30,7 @@ Solo servidor: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY.
 
 Activa Cloud Firestore y Authentication / Google. Aplica firestore.rules en Firebase. Para autorizar a un administrador, crea desde la consola Firebase el documento staff/{uid} con role: "owner" o "admin", donde uid corresponde al usuario que inició sesión con Google. Las APIs verifican este rol del lado servidor; la tienda no concede permisos al usuario final.
 
-Colecciones: products/{id}, orders/{id}, staff/{uid}.
+Colecciones: products/{id}, promotions/{id}, orders/{id}, staff/{uid}.
 
 En producción el catálogo se inicia vacío y debe cargarse con precios oficiales. El cliente ve que el envío no está incluido en el subtotal y queda sujeto a confirmación. No hay pagos en línea.
 
