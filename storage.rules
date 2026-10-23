@@ -1,0 +1,60 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // La asignación de roles se administra en Firestore:
+    // staff/{uid} -> { role: "owner" | "admin" }
+    function isStaff() {
+      return request.auth != null
+        && firestore.exists(
+          /databases/(default)/documents/staff/$(request.auth.uid)
+        )
+        && firestore.get(
+          /databases/(default)/documents/staff/$(request.auth.uid)
+        ).data.role in ['owner', 'admin'];
+    }
+
+    // Solo fotografías optimizadas de hasta 8 MiB.
+    function validImage() {
+      return request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= 8 * 1024 * 1024
+        && request.resource.contentType.matches(
+          'image/(jpeg|png|webp)'
+        );
+    }
+
+    // Fotografía de un producto. Estos archivos son públicos
+    // porque se mostrarán en el catálogo de la tienda.
+    match /catalog/products/{productId}/{fileName} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if isStaff() && validImage();
+      allow delete: if isStaff();
+    }
+
+    // Banners y fotografías de promociones públicas.
+    match /catalog/promotions/{promotionId}/{fileName} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if isStaff() && validImage();
+      allow delete: if isStaff();
+    }
+
+    // Referencias visuales para pedidos personalizados.
+    // Por ahora: solo personal autorizado. No permitir que
+    // visitantes anónimos carguen fotos sin protección antiabuso.
+    match /order-references/{orderId}/{fileName} {
+      allow get: if isStaff();
+      allow list: if false;
+      allow create, update: if isStaff() && validImage();
+      allow delete: if isStaff();
+    }
+
+    // Todas las demás rutas permanecen cerradas.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
