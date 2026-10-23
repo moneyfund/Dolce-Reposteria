@@ -1,20 +1,22 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowDownRight, ArrowLeft, ArrowRight, Check, ChevronDown, Heart, Instagram, Menu, Minus, Plus, Search, ShoppingBag, Sparkles, Star, Trash2, X } from "lucide-react";
+import { ArrowDownRight, ArrowLeft, ArrowRight, Check, ChevronDown, Heart, Instagram, MapPin, Menu, Minus, Plus, Search, ShoppingBag, Sparkles, Star, Trash2, X } from "lucide-react";
 import { categories, currency, type CartItem, type Category, type Product, type DeliveryMethod, type Order, type Promotion } from "@/lib/types";
 import { demoProducts, demoPromotions } from "@/lib/demo";
 import { demoMode, getDemoOrders, getDemoProducts, getDemoPromotions, saveDemoOrders } from "@/lib/demo-storage";
 const CART_KEY = "dolce-cart-v1";
 const heroImage = "https://images.unsplash.com/photo-1464305795204-6f5bbfc7fb81?w=1400&auto=format&fit=crop&q=88";
+// Archivo exacto proporcionado por DOLCE. No se redibuja ni se edita el logotipo.
+const logoImage = "https://d2ol7oe51mr4n9.cloudfront.net/user_3KniZP3dkw5KyzASdx6oDnrJPeH/c19a365e-17e7-4ab2-b9f2-c22070406fc3.png";
 const detailImage = "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=1200&auto=format&fit=crop&q=85";
 const reveal = { initial: { opacity: 0, y: 24 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: "-70px" }, transition: { duration: .55 } };
 function ProductCard({ product, onAdd, index }: { product: Product; onAdd: (p: Product) => void; index: number }) {
-  return <motion.article {...reveal} transition={{ delay: Math.min(index * .065,.25),duration:.45 }} className="product-card">
+  return <motion.article {...reveal} whileHover={{y:-9}} transition={{type:"spring", stiffness:250, damping:25, delay: Math.min(index * .045,.15)}} className="product-card">
     <div className="product-image-wrap">
       <img src={product.image} alt={product.name} loading="lazy" className="product-image" />
       {product.badge && <span className="product-badge">{product.badge}</span>}
-      <button type="button" aria-label={"Agregar "+product.name} className="add-float" onClick={() => onAdd(product)} disabled={product.stock === 0}><Plus size={20}/></button>
+      <motion.button type="button" whileHover={{scale:1.08,rotate:8}} whileTap={{scale:.92}} aria-label={"Agregar "+product.name} className="add-float" onClick={() => onAdd(product)} disabled={product.stock === 0}><Plus size={20}/></motion.button>
     </div>
     <div className="product-meta"><span>{product.category}</span><span className="product-price">{currency(product.price)}</span></div>
     <h3>{product.name}</h3><p>{product.description}</p>
@@ -48,6 +50,7 @@ export default function Storefront() {
   },[]);
   useEffect(()=>{ if(ready) localStorage.setItem(CART_KEY,JSON.stringify(cart)); },[cart,ready]);
   const visible = useMemo(()=> products.filter(p => (category==="Todos" || p.category===category) && (p.name+" "+p.description).toLocaleLowerCase("es").includes(search.toLocaleLowerCase("es"))),[products,category,search]);
+  const heroProduct=products.find(p=>p.featured&&p.active&&p.stock!==0)||products.find(p=>p.active&&p.stock!==0);
   const count=cart.reduce((sum,item)=>sum+item.quantity,0);
   const subtotal=cart.reduce((sum,item)=>sum+item.price*item.quantity,0);
   function add(product: Product) {
@@ -83,26 +86,50 @@ export default function Storefront() {
   const navigate=()=>setMobileOpen(false);
   return <main className="shop-page">
     <header className="site-header">
-      <a className="brand" href="#inicio" onClick={navigate}><span className="brand-mark">✳</span><span>dolce<span className="brand-dot">.</span><small>REPOSTERÍA</small></span></a>
+      <a className="brand brand-original" href="#inicio" onClick={navigate} aria-label="Dolce Pastelería, inicio">
+        <span className="brand-viewport"><img src={logoImage} alt="Dolce Pastelería, logotipo original" width={752} height={428} /></span>
+      </a>
       <nav className={mobileOpen?"nav-links open":"nav-links"} aria-label="Navegación principal">
-        <a href="#inicio" onClick={navigate}>Inicio</a><a href="#catalogo" onClick={navigate}>Delicias</a><a href="#promociones" onClick={navigate}>Especiales</a>
+        <a href="#inicio" onClick={navigate}>Inicio</a>
+        <a href="#catalogo" onClick={navigate}>Productos</a>
+        <a href="#especial" onClick={navigate}>Pedidos especiales</a>
+        <a href="#promociones" onClick={navigate}>Promociones</a>
       </nav>
-      <div className="header-actions"><a href="#catalogo" className="header-order">Explorar menú <ArrowRight size={15}/></a><button className="cart-trigger" type="button" aria-label={"Abrir carrito, "+count+" productos"} onClick={()=>setCartOpen(true)}><ShoppingBag size={20}/>{count>0&&<span className="cart-count">{count}</span>}</button><button className="mobile-menu" type="button" aria-label="Abrir menú" onClick={()=>setMobileOpen(!mobileOpen)}>{mobileOpen?<X size={23}/>:<Menu size={23}/>}</button></div>
-    </header>
-    <section id="inicio" className="hero">
-      <div className="hero-noise"/>
-      <div className="hero-left"><motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{duration:.6}} className="eyebrow eyebrow-light"><span className="eyebrow-line"/> DOLCE · HECHO CON AMOR</motion.div>
-        <motion.h1 initial={{opacity:0,y:32}} animate={{opacity:1,y:0}} transition={{duration:.7,delay:.12}}>La vida sabe <em>mejor</em><br/>con algo dulce<span className="hero-period">.</span></motion.h1>
-        <motion.p initial={{opacity:0,y:22}} animate={{opacity:1,y:0}} transition={{duration:.7,delay:.24}} className="hero-sub">Pequeños antojos. Grandes momentos.<br/>Repostería artesanal que enamora.</motion.p>
-        <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:.6,delay:.3}} className="hero-buttons"><a className="button-primary" href="#catalogo">Elegir mi favorito <ArrowUpIcon/></a><a href="#especial" className="button-text">Descubrir más <ArrowRight size={17}/></a></motion.div>
-        <div className="hero-bottom"><span><Star size={15} fill="currentColor"/> Preparado con cariño</span><span className="vertical-line"/><span>Matagalpa, Nicaragua</span></div>
+      <div className="header-actions">
+        <button type="button" className="header-order" onClick={()=>setCartOpen(true)}>Hacer un pedido <ArrowRight size={16}/></button>
+        <button className="cart-trigger" type="button" aria-label={"Abrir carrito, "+count+" productos"} onClick={()=>setCartOpen(true)}><ShoppingBag size={20}/>{count>0&&<motion.span key={count} initial={{scale:.4}} animate={{scale:1}} transition={{type:"spring",stiffness:460,damping:20}} className="cart-count">{count}</motion.span>}</button>
+        <button className="mobile-menu" type="button" aria-label={mobileOpen?"Cerrar menú":"Abrir menú"} aria-expanded={mobileOpen} onClick={()=>setMobileOpen(!mobileOpen)}>{mobileOpen?<X size={23}/>:<Menu size={23}/>}</button>
       </div>
-      <div className="hero-visual"><motion.div initial={{opacity:0,scale:.92,rotate:3}} animate={{opacity:1,scale:1,rotate:0}} transition={{duration:.9,delay:.14}} className="hero-photo-frame"><img src={heroImage} alt="Pastel artesanal decorado" className="hero-photo"/><div className="hero-photo-overlay"/></motion.div><motion.div initial={{opacity:0,scale:.7}} animate={{opacity:1,scale:1}} transition={{delay:.7}} className="hero-sticker"><span>un poquito<br/>de felicidad</span><Heart size={16} fill="currentColor"/></motion.div><div className="hero-scribble">✦</div><div className="hero-vertical-text">UNA DULCE EXPERIENCIA · EST. MATAGALPA</div></div>
-      <div className="hero-scroll"><span>DESLIZA PARA DESCUBRIR</span><ArrowDownRight size={16}/></div>
+    </header>
+    <section id="inicio" className="hero dolce-hero">
+      <div className="hero-noise" aria-hidden="true"/>
+      <div className="hero-left">
+        <motion.div initial={{opacity:0,y:14}} animate={{opacity:1,y:0}} transition={{duration:.6}} className="hero-label"><span className="hero-label-star">✳</span> DOLCE PASTELERÍA <span className="hero-label-divider"/> MATAGALPA, NICARAGUA</motion.div>
+        <motion.h1 initial={{opacity:0,y:26}} animate={{opacity:1,y:0}} transition={{duration:.75,delay:.12}}>Matagalpa tiene<br/><em>un lado dulce.</em></motion.h1>
+        <motion.p initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} transition={{duration:.62,delay:.25}} className="hero-sub">Repostería artesanal de Matagalpa. Pasteles, postres y detalles para tus celebraciones y antojos.</motion.p>
+        <motion.div initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} transition={{duration:.62,delay:.34}} className="hero-buttons">
+          <a className="button-primary" href="#catalogo">Explorar sabores <ArrowRight size={17}/></a>
+          <a href="#especial" className="button-text">Pedidos especiales <ArrowRight size={17}/></a>
+        </motion.div>
+        <div className="hero-bottom"><span><MapPin size={15}/> Repostería de Matagalpa</span><span className="vertical-line"/><span>Hecho para tus momentos</span></div>
+      </div>
+      <div className="hero-visual">
+        <motion.div initial={{opacity:0,scale:1.06,x:38}} animate={{opacity:1,scale:1,x:0}} transition={{duration:1.05,ease:[.18,.72,.25,1]}} className="hero-photo-frame">
+          <img src={heroProduct?.image||heroImage} alt={heroProduct?heroProduct.name:"Repostería artesanal de DOLCE"} className="hero-photo" fetchPriority="high"/>
+          <div className="hero-photo-overlay"/>
+          <div className="hero-image-counter">01 <span>/ DOLCE FAVORITOS</span></div>
+        </motion.div>
+        <motion.div initial={{opacity:0,y:35,rotate:-8}} animate={{opacity:1,y:0,rotate:-5}} transition={{delay:.62,type:"spring",stiffness:120,damping:15}} className="hero-sticker"><span>Hecho en<br/><strong>Matagalpa</strong></span><MapPin size={17}/></motion.div>
+        {heroProduct && <motion.button type="button" initial={{opacity:0,y:30}} animate={{opacity:1,y:0}} transition={{delay:.78,duration:.55}} className="hero-featured-product" onClick={()=>add(heroProduct)}>
+          <span className="hero-featured-label">UNA DELICIA PARA TI</span><span className="hero-featured-name">{heroProduct.name}</span><span className="hero-featured-bottom">{currency(heroProduct.price)} <span><Plus size={17}/></span></span>
+        </motion.button>}
+        <span className="hero-corner-script" aria-hidden="true">Dulces momentos<br/>desde nuestra ciudad.</span>
+      </div>
+      <div className="hero-scroll"><span>CONOCE NUESTROS SABORES</span><a href="#catalogo" aria-label="Ver productos"><ArrowDownRight size={21}/></a></div>
     </section>
-    <section className="strip"><div className="strip-track"><span>Recién hecho</span><span>✳</span><span>Para compartir</span><span>✳</span><span>Momentos especiales</span><span>✳</span><span>Hecho con amor</span><span>✳</span><span>Recién hecho</span><span>✳</span><span>Para compartir</span><span>✳</span></div></section>
+    <section className="strip"><div className="strip-track"><span>Repostería de Matagalpa</span><span>✳</span><span>Sabores para compartir</span><span>✳</span><span>Momentos especiales</span><span>✳</span><span>Hecho con amor</span><span>✳</span><span>Recién hecho</span><span>✳</span><span>Para compartir</span><span>✳</span></div></section>
     <section id="catalogo" className="catalog section-shell">
-      <motion.div {...reveal} className="section-heading"><div><span className="eyebrow"><span className="eyebrow-line"/> DESCUBRE NUESTRO MENÚ</span><h2>Un antojo para <em>cada ocasión.</em></h2></div><p>Elige, combina y pide tus favoritos.</p></motion.div>
+      <motion.div {...reveal} className="section-heading"><div><span className="eyebrow"><span className="eyebrow-line"/> DESCUBRE NUESTRO MENÚ</span><h2>La vitrina de <em>Dolce.</em></h2></div><p>Descubre tu próximo favorito.</p></motion.div>
       <div className="catalog-controls"><div className="category-scroll" role="group" aria-label="Filtrar por categoría">{categories.map(cat=><button type="button" key={cat} onClick={()=>setCategory(cat)} className={"category-pill "+(category===cat?"selected":"")}>{cat}</button>)}</div><label className="search-box"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="¿Qué se te antoja?" aria-label="Buscar producto"/></label></div>
       {error&&!cartOpen&&<p className="inline-error" role="alert">{error}</p>}
       {visible.length ? <div className="product-grid">{visible.map((product,index)=><ProductCard key={product.id} product={product} onAdd={add} index={index}/>)}</div>:<div className="empty-results"><Sparkles size={30}/><h3>No encontramos ese antojo</h3><p>Prueba con otra categoría o palabra.</p><button onClick={()=>{setSearch("");setCategory("Todos");}}>Ver todos</button></div>}

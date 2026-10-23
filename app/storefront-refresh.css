@@ -1,0 +1,151 @@
+/* DOLCE: store identity refresh (wine + cream + gold from original logo).
+   Scoped to shop-page: the management dashboard retains its own styles. */
+.shop-page{--gold:#c7963c;--goldLight:#ebc484;--pastry:#fcf6ed;--merlot:#55293c;background:var(--pastry)}
+.shop-page .site-header{position:relative;top:auto;left:auto;min-height:94px;padding:5px 5.5%;background:#fff;color:#2c2527;box-shadow:0 1px 0 #e8e0d3;gap:25px}
+.shop-page .brand-original{width:180px;height:87px;display:block;flex:none;overflow:hidden;position:relative;line-height:1}
+.shop-page .brand-viewport{width:100%;height:100%;display:block;position:relative;overflow:hidden}
+.shop-page .brand-viewport img{position:absolute;display:block;max-width:none;width:248px;height:auto;left:-39px;top:-14px;pointer-events:none}
+.shop-page .nav-links{gap:clamp(14px,2.6vw,38px);margin-left:0}
+.shop-page .nav-links a{color:#51484b;font-size:12px;position:relative;padding:10px 0}
+.shop-page .nav-links a::after{content:"";position:absolute;width:0;height:2px;background:var(--gold);bottom:3px;left:0;transition:width .3s}
+.shop-page .nav-links a:hover{color:#a27537}
+.shop-page .nav-links a:hover::after{width:100%}
+.shop-page .header-actions{gap:12px}
+.shop-page .header-order{background:var(--merlot);border:0;border-radius:30px;min-height:46px;padding:0 19px;display:inline-flex;align-items:center;justify-content:center;gap:13px;color:#fff;font-size:12px;font-weight:800;white-space:nowrap;transition:background .25s,transform .25s}
+.shop-page .header-order:hover{background:#763b53;transform:translateY(-2px)}
+.shop-page .cart-trigger{background:#fbf6ef;border:1px solid #e4d8c8;color:#462e38;width:45px;height:45px}
+.shop-page .cart-trigger:hover{background:#f3e7d4}
+.shop-page .cart-count{background:var(--gold);color:white}
+.shop-page .mobile-menu{color:#513d45}
+.shop-page .hero.dolce-hero{min-height:668px;display:grid;grid-template-columns:53% 47%;padding:58px 5.5% 65px;gap:0;align-items:center;background:radial-gradient(ellipse at 10% 10%,#7a4559,transparent 45%),radial-gradient(ellipse at 89% 90%,#6c374d,transparent 40%),linear-gradient(112deg,#55293c 0%,#3e202d 75%);color:#fff8ed;overflow:hidden}
+.shop-page .dolce-hero::before{left:-370px;right:auto;top:-50px;width:650px;height:650px;border:1px solid #eac4881c;box-shadow:0 0 0 100px #eac48809,0 0 0 180px #eac48804}
+.shop-page .hero-left{position:relative;z-index:3;padding:0 30px 0 0}
+.shop-page .hero-label{color:#edc58c;font-size:10px;font-weight:800;letter-spacing:.14em;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.shop-page .hero-label-star{font-size:22px;color:#f0d0ab}
+.shop-page .hero-label-divider{height:13px;width:1px;background:#f4c99780}
+.shop-page .hero h1{font-family:var(--font-display),serif;font-size:clamp(55px,5.5vw,91px);font-weight:500;line-height:1.075;letter-spacing:-.058em;max-width:760px;margin:31px 0 23px;text-wrap:balance}
+.shop-page .hero h1 em{font-weight:400;color:var(--goldLight)}
+.shop-page .hero h1 span{color:#f2cbca}
+.shop-page .hero-sub{font-size:15px;line-height:1.8;max-width:445px;color:#f1dde0;margin:0 0 32px}
+.shop-page .hero-buttons{gap:22px;flex-wrap:wrap}
+.shop-page .button-primary{background:var(--gold);color:#2b211b}
+.shop-page .button-primary:hover{background:#e3b65e}
+.shop-page .button-text{color:#f8eae6;font-size:12px;gap:11px}
+.shop-page .button-text svg{color:#e5bc80}
+.shop-page .hero-bottom{color:#dec4c5;margin-top:58px;font-size:11px;gap:21px}
+.shop-page .hero-bottom svg{color:#e5bc80}
+.shop-page .vertical-line{background:#d4ac8b70}
+.shop-page .hero-visual{height:538px;min-width:0;width:100%;padding:8px 31px 8px 12px;position:relative}
+.shop-page .hero-photo-frame{height:100%;width:100%;max-width:none;padding:0;border-radius:13px;border:1px solid #eac4885c;overflow:hidden;box-shadow:20px 21px 0 #d3a26d13,0 30px 65px #22111886;background:#5e3840}
+.shop-page .hero-photo{height:100%;width:100%;object-fit:cover;object-position:center;border-radius:12px;filter:saturate(.94);transition:transform .75s ease}
+.shop-page .hero-photo-frame:hover .hero-photo{transform:scale(1.045)}
+.shop-page .hero-photo-overlay{inset:0;border-radius:12px;background:linear-gradient(0deg,#1d111ab0,transparent 35%)}
+.shop-page .hero-image-counter{position:absolute;bottom:21px;left:21px;font:400 26px var(--font-display),serif;color:white;display:flex;align-items:center;gap:10px}
+.shop-page .hero-image-counter span{font:800 9px var(--font-sans),sans-serif;letter-spacing:.13em;color:#ecdbd0}
+.shop-page .hero-sticker{left:-35px;bottom:91px;height:116px;width:116px;background:#eedbb3;color:#603d42;outline:1px dashed #a7814e;outline-offset:-10px;border:4px solid #eedbb3;box-shadow:0 13px 36px #21101877}
+.shop-page .hero-sticker span{font:normal 15px var(--font-display),serif;line-height:1.1}
+.shop-page .hero-sticker strong{font-weight:700}
+.shop-page .hero-sticker svg{color:#a47933}
+.shop-page .hero-featured-product{position:absolute;bottom:0;right:-11px;z-index:4;max-width:225px;width:58%;background:#fffaf2;border:1px solid #f2e1c8;border-radius:13px;box-shadow:0 23px 50px #2010168e;padding:19px 18px 15px;text-align:left;display:flex;flex-direction:column;gap:7px;color:#3e2a30;transition:transform .3s,box-shadow .3s}
+.shop-page .hero-featured-product:hover{transform:translateY(-7px);box-shadow:0 27px 58px #201016a9}
+.shop-page .hero-featured-label{font-size:9px;font-weight:800;letter-spacing:.16em;color:#9d7542}
+.shop-page .hero-featured-name{font:600 21px var(--font-display),serif;line-height:1.2}
+.shop-page .hero-featured-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px;font-weight:800;color:#9b6829;font-size:14px}
+.shop-page .hero-featured-bottom span{height:30px;width:30px;display:grid;place-items:center;border-radius:50%;background:#56293b;color:#fff}
+.shop-page .hero-corner-script{position:absolute;right:9px;top:-7px;writing-mode:vertical-rl;color:#eed4ad;font:italic 14px var(--font-display),serif}
+.shop-page .hero-scroll{left:5.5%;right:auto;bottom:17px;gap:12px;color:#eed1a6}
+.shop-page .hero-scroll a{border:1px solid #e4c2968c;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;transition:background .2s}
+.shop-page .hero-scroll a:hover{background:#ffffff19}
+.shop-page .strip{background:#e8cfae;height:58px;color:#603e42}
+.shop-page .strip-track span:nth-child(even){color:#b28948}
+.shop-page .catalog{background:var(--pastry);padding-top:100px;padding-bottom:90px}
+.shop-page .section-heading h2{color:#342729}
+.shop-page .section-heading h2 em,.shop-page .special h2 em{color:#a67435}
+.shop-page .eyebrow{color:#936c45}
+.shop-page .category-pill{background:#fffcf8;color:#665253;border-color:#e7daca}
+.shop-page .category-pill:hover{background:#f3e8d8}
+.shop-page .category-pill.selected{background:#5a293d;border-color:#5a293d;color:white;box-shadow:0 8px 17px #5a293d21}
+.shop-page .search-box{color:#9d7b4f;border-bottom-color:#cbbba5}
+.shop-page .product-grid{gap:23px 19px;align-items:start}
+.shop-page .product-card{display:flex;flex-direction:column;position:relative;background:#fffdfa;border:1px solid #ebe0d2;border-radius:17px;overflow:hidden;min-height:100%;box-shadow:0 9px 23px #40291f0a;transition:box-shadow .35s,border-color .35s;will-change:transform}
+.shop-page .product-card:hover{border-color:#d8b58c;box-shadow:0 24px 47px #4b242c2b}
+.shop-page .product-card::before{content:"";position:absolute;pointer-events:none;z-index:3;left:-120%;top:-75%;width:55%;height:260%;transform:rotate(25deg);background:linear-gradient(90deg,transparent,#ffffff22,transparent);transition:left .75s}
+.shop-page .product-card:hover::before{left:180%}
+.shop-page .product-image-wrap{aspect-ratio:1.02;border-radius:0}
+.shop-page .product-image{transition:transform .7s cubic-bezier(.2,.8,.2,1),filter .4s}
+.shop-page .product-card:hover .product-image{transform:scale(1.09);filter:saturate(1.08)}
+.shop-page .product-badge{border-radius:999px;background:#fffaf1e8;border:1px solid #e5cfa9;color:#6a4838}
+.shop-page .add-float{background:#55293c;color:white;border-radius:50%;box-shadow:0 7px 19px #39172657;transition:background .2s}
+.shop-page .add-float:hover{background:#b48337}
+.shop-page .product-meta{margin:18px 17px 0;color:#a47e56}
+.shop-page .product-price{color:#a37029;font-size:15px}
+.shop-page .product-card h3{font-size:22px;color:#34262a;margin:10px 17px 7px}
+.shop-page .product-card p{font-size:12px;color:#86767a;min-height:46px;margin:0 17px}
+.shop-page .card-action{align-self:flex-start;margin:9px 17px 19px;border-color:#c69d67;color:#633c4a}
+.shop-page .catalog-end{border-color:#e6d9c7;color:#947258}
+.shop-page .promo-section{background:var(--pastry)}
+.shop-page .promo-tile{border-radius:14px}
+.shop-page .promo-tile-copy>span,.shop-page .promo-tile-copy a{color:#f4d19c}
+.shop-page .special{background:#efe2d1}
+.shop-page .special-copy>p{color:#795f60}
+.shop-page .closing-cta{min-height:380px;background:radial-gradient(ellipse at 50% 0,#7c4355,transparent 53%),linear-gradient(110deg,#40212d,#55273a)}
+.shop-page .closing-cta h2 em{color:#e9bf7e}
+.shop-page .closing-cta .eyebrow{color:#efd3a5}
+.shop-page .footer{background:#312329}
+.shop-page .footer-brand span{color:#d6a04f}
+.shop-page .demo-ribbon{background:#fff8e9ed;color:#62433a;border-color:#e9d2a8}
+@media(max-width:1180px){
+.shop-page .site-header{padding-left:4%;padding-right:4%;gap:13px}
+.shop-page .nav-links{gap:16px}.shop-page .nav-links a{font-size:11px}
+.shop-page .hero.dolce-hero{grid-template-columns:55% 45%;min-height:610px}
+.shop-page .hero h1{font-size:clamp(49px,5.5vw,75px)}
+.shop-page .hero-visual{height:470px}.shop-page .hero-sticker{height:97px;width:97px;left:-17px}
+.shop-page .hero-featured-product{max-width:190px}
+}
+@media(max-width:800px){
+.shop-page .site-header{height:89px;min-height:89px;padding:5px 5%}
+.shop-page .brand-original{width:156px;height:75px}.shop-page .brand-viewport img{width:215px;left:-34px;top:-12px}
+.shop-page .nav-links{top:83px;left:4%;right:4%;background:#fffaf2;border:1px solid #efe3d4;border-radius:13px;padding:14px}
+.shop-page .nav-links a{font-size:13px;color:#4d3840;padding:14px}
+.shop-page .hero.dolce-hero{grid-template-columns:1fr 1fr;min-height:570px;padding:45px 5% 58px}
+.shop-page .hero h1{font-size:clamp(44px,6vw,61px)}.shop-page .hero-sub{font-size:13px}
+.shop-page .hero-visual{height:395px;padding:8px 15px}
+.shop-page .hero-featured-product{right:-10px;padding:14px;max-width:190px}
+.shop-page .hero-featured-name{font-size:17px}
+.shop-page .hero-corner-script{display:none}
+.shop-page .hero-bottom{margin-top:30px}
+.shop-page .product-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:600px){
+.shop-page .site-header{height:79px;min-height:79px;padding:5px 5%;gap:8px}
+.shop-page .brand-original{width:135px;height:65px}.shop-page .brand-viewport img{width:186px;left:-29px;top:-10px}
+.shop-page .header-actions{gap:8px}.shop-page .header-order{width:43px;height:43px;min-height:43px;padding:0;font-size:0;display:grid;place-items:center}.shop-page .header-order svg{width:19px;height:19px}
+.shop-page .cart-trigger{width:41px;height:41px}.shop-page .nav-links{top:75px}
+.shop-page .hero.dolce-hero{display:flex;flex-direction:column;align-items:stretch;min-height:auto;padding:45px 7% 55px;gap:0}
+.shop-page .hero-left{padding:0}
+.shop-page .hero-label{font-size:9px;gap:7px;letter-spacing:.08em}.shop-page .hero-label-star{font-size:16px}
+.shop-page .hero h1{font-size:clamp(45px,10.5vw,62px);margin:19px 0 15px;line-height:1.1}
+.shop-page .hero-sub{font-size:13px;max-width:340px;line-height:1.7;margin-bottom:22px}
+.shop-page .hero-buttons{gap:15px}.shop-page .button-text{font-size:11px}
+.shop-page .hero-bottom{margin-top:24px;font-size:10px;gap:12px}
+.shop-page .hero-visual{height:355px;width:100%;max-width:475px;margin:25px auto 0;padding:4px 22px 20px 12px}
+.shop-page .hero-photo-frame{height:100%;width:100%;border-radius:12px}
+.shop-page .hero-photo,.shop-page .hero-photo-overlay{border-radius:12px}
+.shop-page .hero-sticker{width:87px;height:87px;left:-7px;bottom:65px}
+.shop-page .hero-sticker span{font-size:12px}.shop-page .hero-sticker strong{font-size:13px}
+.shop-page .hero-featured-product{max-width:195px;right:0;bottom:-2px;width:57%;padding:11px 12px;gap:5px}
+.shop-page .hero-featured-label{font-size:8px}.shop-page .hero-featured-name{font-size:17px}
+.shop-page .hero-featured-bottom{font-size:12px}.shop-page .hero-featured-bottom span{width:25px;height:25px}
+.shop-page .hero-image-counter{font-size:20px;left:13px;bottom:15px}.shop-page .hero-image-counter span{font-size:8px}
+.shop-page .hero-scroll{display:none}
+.shop-page .strip{height:48px}
+.shop-page .catalog{padding-top:62px;padding-bottom:60px}.shop-page .section-heading h2{font-size:clamp(39px,9vw,49px)}
+.shop-page .product-grid{gap:14px 11px}.shop-page .product-card{border-radius:13px}
+.shop-page .product-image-wrap{aspect-ratio:.9}
+.shop-page .product-meta{margin:12px 11px 0;font-size:10px}.shop-page .product-price{font-size:12px}
+.shop-page .product-card h3{font-size:18px;margin:8px 11px 4px}
+.shop-page .product-card p{font-size:10px;min-height:43px;margin:0 11px}
+.shop-page .card-action{font-size:10px;margin:8px 11px 16px}
+.shop-page .add-float{width:37px;height:37px}.shop-page .product-badge{font-size:8px}
+}
+@media(prefers-reduced-motion:reduce){.shop-page .product-card,.shop-page .product-card::before,.shop-page .product-image,.shop-page .hero-photo{transition:none!important}}
