@@ -274,3 +274,24 @@ img{display:block;max-width:100%}
 .firebase-check-strip .firebase-check-dot{background:#b68095;width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .firebase-check-strip button{margin-left:auto;border:0;background:transparent;color:#87516a;font-size:11px;font-weight:800;display:flex;align-items:center;gap:7px;white-space:nowrap}
 .firebase-check-strip button:disabled{opacity:.55}
+
+.firebase-setup-link{font-size:11px;color:#87516a;text-decoration:underline;font-weight:800;display:inline-flex;align-items:center;gap:4px}
+.access-setup{min-height:100vh;background:radial-gradient(circle at 15% 15%,#8a475d,#3c1725 70%);display:flex;justify-content:center;align-items:center;padding:76px 20px 32px;position:relative}
+.access-return{position:absolute;left:5%;top:31px;color:#f5dde4;display:flex;align-items:center;gap:9px;font-size:12px}
+.access-card{background:#fff9f4;width:min(510px,100%);padding:39px;border-radius:23px;box-shadow:0 30px 80px #220b1542}
+.access-icon{width:54px;height:54px;background:#f4e1e3;color:#86516a;border-radius:17px;display:grid;place-items:center;margin-bottom:20px}
+.access-card h1{font:500 45px var(--font-display),serif;line-height:1.1;letter-spacing:-.04em;margin:14px 0}
+.access-card h1 em{color:#ae687e;font-weight:400}
+.access-card>p{font-size:13px;line-height:1.75;color:#8c7780;margin:0 0 24px}
+.access-identity{background:#f8ebe8;border-radius:12px;padding:14px 16px;margin:20px 0 24px;color:#603c4e}
+.access-identity strong{display:block;font-size:14px}.access-identity small{font-size:12px;display:block;margin-top:5px;color:#9b7b86}
+.access-field-label{display:block;font-size:11px;font-weight:800;margin-bottom:9px;color:#694a59}
+.uid-copy{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:1px solid #e7d5d6;border-radius:11px;padding:7px 8px 7px 13px}
+.uid-copy code{overflow-wrap:anywhere;color:#622f43;font-size:11px}.uid-copy button{border:0;background:#f7e8e8;color:#7a4258;border-radius:9px;width:37px;height:37px;display:grid;place-items:center;flex-shrink:0}
+.access-instructions{display:flex;gap:10px;align-items:flex-start;border:1px solid #eddbd9;background:#fcf4ee;padding:13px 14px;margin-top:19px;border-radius:12px;color:#865b6b}
+.access-instructions svg{flex-shrink:0}.access-instructions p{font-size:11px;line-height:1.65;margin:0}
+.access-instructions code{font-size:10px;background:#f0dedd;padding:2px 4px;border-radius:4px}
+.access-logout{display:flex;align-items:center;gap:8px;background:none;border:0;color:#91677a;font-size:11px;font-weight:700;margin-top:19px;padding:8px 0}
+.access-disclaimer{font-size:10px!important;margin:22px 0 0!important;color:#a18a92!important}
+.access-card>.form-error{margin-top:14px}
+@media(max-width:600px){.access-card{padding:29px 21px}.access-card h1{font-size:39px}}

@@ -41,3 +41,11 @@ En modo real, el catálogo se inicia vacío y debe cargarse con precios oficiale
 Confirmar marca, fotos, precio, cobertura, forma de cobro, horario, políticas de cancelación, privacidad, aviso de pedidos y protección contra automatización/abuso. Revisar permisos en Firebase, probar el flujo de reserva de stock y establecer un mecanismo de notificación al negocio.
 
 Este desarrollo constituye un prototipo funcional de transferencia digital para la tesis UNAN. No demuestra por sí solo una mejora cuantificada de las ventas o posicionamiento.
+
+## Alta segura del propietario
+
+1. Antes de activar modo real, abre /admin/acceso e inicia sesión con tu cuenta Google autorizada en Firebase Authentication.
+2. Copia tu UID y crea en Firestore `staff/{uid}` con el campo `role` (string) igual a `owner`.
+3. En Vercel configura `FIREBASE_CLIENT_EMAIL` y `FIREBASE_PRIVATE_KEY` directamente desde una cuenta de servicio de Firebase, sin compartir el archivo JSON o la clave por chat.
+4. Publica las reglas del repositorio y comprueba en Manager la lectura pública de Firestore.
+5. Una vez revisadas las operaciones con datos reales, configura `NEXT_PUBLIC_DOLCE_LIVE_MODE=true` y vuelve a desplegar.
