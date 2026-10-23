@@ -7,7 +7,7 @@ Tienda pública + DOLCE Manager para DOLCE Repostería. Next.js 15, React 19, Ty
 - Tienda editorial responsive: categorías, búsqueda, catálogo, carrito persistente, modalidad entrega/retiro, fecha, dedicatoria y registro de pedidos.
 - Dashboard (/admin): métricas, gráfico semanal, pedidos con cambios de estado, clientes y gestión de productos/stock y campañas promocionales editables.
 - Backend: API de pedidos que valida precios e inventario en servidor con Firestore y transacciones. API de administración protegida con Firebase Authentication y rol de personal.
-- Demo sin Firebase: catálogo, pedidos y edición local en el navegador. **No son pedidos reales**.
+- Modo de demostración controlado explícitamente por `NEXT_PUBLIC_DOLCE_LIVE_MODE` (por defecto desactivado el modo real): catálogo, pedidos y edición local en el navegador. **No son pedidos reales**. La configuración pública de Firebase por sí sola no habilita pedidos reales.
 
 Las fotografías, nombres, clientes y precios iniciales son demostrativos y deben sustituirse por información autorizada por DOLCE.
 
@@ -24,7 +24,7 @@ Requisitos: Node.js 20+.
 
 Configura en Vercel las variables del archivo .env.example.
 
-Variables públicas: NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, NEXT_PUBLIC_FIREBASE_PROJECT_ID, NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET, NEXT_PUBLIC_FIREBASE_APP_ID.
+Variables públicas: NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, NEXT_PUBLIC_FIREBASE_PROJECT_ID, NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET, NEXT_PUBLIC_FIREBASE_APP_ID, NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID, NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID.
 
 Solo servidor: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY. Nunca compartas la clave privada por chat ni la publiques en GitHub. Configúrala directamente en las variables protegidas de Vercel.
 
@@ -32,7 +32,9 @@ Activa Cloud Firestore y Authentication / Google. Aplica firestore.rules en Fire
 
 Colecciones: products/{id}, promotions/{id}, orders/{id}, staff/{uid}.
 
-En producción el catálogo se inicia vacío y debe cargarse con precios oficiales. El cliente ve que el envío no está incluido en el subtotal y queda sujeto a confirmación. No hay pagos en línea.
+Antes de lanzar operaciones reales: configurar credenciales privadas, cargar un usuario en staff, publicar firestore.rules, verificar pedidos/estados en pruebas y finalmente poner NEXT_PUBLIC_DOLCE_LIVE_MODE=true en Vercel y volver a desplegar. El ID de Analytics es opcional; la analítica no se activa hasta configurar el consentimiento y la política correspondiente.
+
+En modo real, el catálogo se inicia vacío y debe cargarse con precios oficiales. El cliente ve que el envío no está incluido en el subtotal y queda sujeto a confirmación. No hay pagos en línea.
 
 ## Antes de habilitar atención real
 
