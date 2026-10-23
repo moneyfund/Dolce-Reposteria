@@ -4,7 +4,8 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis } f
 import { ArrowDownLeft, ArrowLeft, ArrowRight, BarChart3, CalendarDays, Check, ChevronDown, ClipboardList, Eye, LayoutDashboard, LogOut, Menu, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Sparkles, TrendingUp, Users, Wallet, X } from "lucide-react";
 import { categories, currency, type Category, type Order, type OrderStatus, type Product, type Promotion } from "@/lib/types";
 import { demoMode, getDemoOrders, getDemoProducts, getDemoPromotions, saveDemoOrders, saveDemoProducts, saveDemoPromotions } from "@/lib/demo-storage";
-import { firebaseAuth } from "@/lib/firebase-client";
+import { firebaseApp, firebaseAuth, hasFirebaseClient } from "@/lib/firebase-client";
+import { collection, getDocs, getFirestore, limit, query, where } from "firebase/firestore";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 type View = "resumen" | "pedidos" | "productos" | "promociones" | "clientes";
 const stateOptions: OrderStatus[] = ["Nuevo","Confirmado","Preparando","Listo","Entregado","Cancelado"];
@@ -28,6 +29,7 @@ export default function AdminDashboard() {
   const [loading,setLoading]=useState(!demoMode);
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState("");
+  const [connection,setConnection]=useState<"idle"|"checking"|"connected"|"failed">("idle");
   const [search,setSearch]=useState("");
   const [sideOpen,setSideOpen]=useState(false);
   const [editing,setEditing]=useState<Product|null>(null);
@@ -62,6 +64,15 @@ export default function AdminDashboard() {
     });
     return()=>unsub();
   },[refresh]);
+  async function testConnection(){
+    if(!hasFirebaseClient){setConnection("failed");return;}
+    setConnection("checking");
+    try{
+      const db=getFirestore(firebaseApp());
+      await getDocs(query(collection(db,"products"),where("active","==",true),limit(1)));
+      setConnection("connected");
+    }catch{setConnection("failed");}
+  }
   async function login(){
     setLoading(true);setError("");
     try {await signInWithPopup(firebaseAuth(),new GoogleAuthProvider());await refresh();}
@@ -136,6 +147,7 @@ export default function AdminDashboard() {
     <aside className={"admin-sidebar "+(sideOpen?"open":"")}><div className="admin-sidebar-top"><a href="/" className="admin-logo">dolce<span>.</span><small>MANAGER</small></a><span className="workspace-label">ESPACIO DE TRABAJO</span><nav className="admin-nav" aria-label="Administración">{tabs.map(item=>{const Icon=item.icon;return <button key={item.id} className={view===item.id?"active":""} onClick={()=>navigate(item.id)}><Icon size={19}/>{item.label}{item.id==="pedidos"&&newOrders>0&&<span className="nav-count">{newOrders}</span>}</button>;})}</nav></div><div className="admin-sidebar-bottom"><div className="sidebar-tip"><Sparkles size={19}/><strong>Tu negocio, más cerca.</strong><p>Todo lo que necesitas en un solo lugar.</p></div><a className="sidebar-store" href="/" target="_blank" rel="noreferrer"><ShoppingBag size={18}/> Ver tienda <ArrowRight size={16}/></a>{!demoMode&&<button className="sidebar-logout" onClick={()=>signOut(firebaseAuth())}><LogOut size={16}/> Cerrar sesión</button>}</div></aside>
     <div className="admin-main"><header className="admin-topbar"><button className="admin-mobile-menu" aria-label="Menú" onClick={()=>setSideOpen(true)}><Menu size={23}/></button><div className="admin-breadcrumb">DOLCE <span>/</span> {tabs.find(t=>t.id===view)?.label}</div><div className="topbar-right">{demoMode&&<span className="demo-tag">Modo demostración</span>}<span className="online-dot"/> <span className="user-name">{userName}</span><span className="avatar">D</span></div></header>
       <div className="admin-content">
+      {demoMode&&<div className="firebase-check-strip"><span className="firebase-check-dot"/><span>{!hasFirebaseClient?"La aplicación aún no tiene configuración pública Firebase.":connection==="connected"?"Firestore responde correctamente a consultas públicas.":connection==="failed"?"No se pudo leer Firestore. Revisa la base de datos y sus reglas.":connection==="checking"?"Verificando conexión con Firestore...":"Firebase web configurado · Firestore todavía sin comprobar."}</span><button type="button" onClick={()=>void testConnection()} disabled={connection==="checking"||!hasFirebaseClient}>{connection==="checking"?"Comprobando...":"Probar conexión"} <ArrowRight size={14}/></button></div>}
       {error&&<div className="admin-error" role="alert">{error}<button onClick={()=>setError("")}><X size={17}/></button></div>}
       {view==="resumen"&&<><div className="admin-page-title"><div><span className="eyebrow">CENTRO DE CONTROL</span><h1>Un gran día comienza <em>aquí.</em></h1><p>Esto es lo que está pasando en tu negocio.</p></div><span className="today-tag"><CalendarDays size={16}/>{new Date().toLocaleDateString("es-NI",{day:"numeric",month:"long",year:"numeric"})}</span></div>
         <div className="kpi-grid"><div className="kpi-card"><span>Ventas completadas <Wallet size={20}/></span><strong>{currency(revenue)}</strong><small>Pedidos entregados registrados</small></div><div className="kpi-card"><span>Pedidos en proceso <ClipboardList size={20}/></span><strong>{pending}</strong><small>{newOrders} nuevos por confirmar</small></div><div className="kpi-card"><span>Clientes <Users size={20}/></span><strong>{customers.length}</strong><small>Con pedidos registrados</small></div><div className="kpi-card"><span>Productos activos <Package size={20}/></span><strong>{products.filter(p=>p.active).length}</strong><small>Disponibles en el catálogo</small></div></div>

@@ -269,3 +269,8 @@ img{display:block;max-width:100%}
 .promo-admin-actions{display:flex;align-items:center;gap:10px;margin-top:20px;flex-wrap:wrap}
 .promo-admin-actions button{display:flex;align-items:center;gap:6px;font-size:11px;color:#704052;font-weight:700;border:1px solid #e8d6db;background:#fff;border-radius:10px;padding:9px}
 @media(max-width:600px){.promo-section{padding-bottom:58px}.promo-header>span:last-child{display:none}.promo-tile{min-height:310px}.promo-tile-copy{padding:28px}.promo-tile-copy h2{font-size:38px}}
+
+.firebase-check-strip{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid #e9ded8;border-radius:12px;padding:11px 15px;background:#fffaf5;color:#765f67;font-size:11px;font-weight:600;margin-bottom:22px}
+.firebase-check-strip .firebase-check-dot{background:#b68095;width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.firebase-check-strip button{margin-left:auto;border:0;background:transparent;color:#87516a;font-size:11px;font-weight:800;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.firebase-check-strip button:disabled{opacity:.55}
