@@ -2,9 +2,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowDownRight, ArrowLeft, ArrowRight, Check, ChevronDown, Heart, Instagram, MapPin, Menu, Minus, Plus, Search, ShoppingBag, Sparkles, Star, Trash2, X } from "lucide-react";
-import { categories, currency, type CartItem, type Category, type Product, type DeliveryMethod, type Order, type Promotion } from "@/lib/types";
+import { categories, currency, type CartItem, type Category, type Product, type DeliveryMethod, type Promotion } from "@/lib/types";
 import { demoProducts, demoPromotions } from "@/lib/demo";
-import { demoMode, getDemoOrders, getDemoProducts, getDemoPromotions, saveDemoOrders } from "@/lib/demo-storage";
+import { demoMode, getDemoProducts, getDemoPromotions } from "@/lib/demo-storage";
+import { firebaseApp, hasFirebaseClient } from "@/lib/firebase-client";
+import { collection, getFirestore, limit, onSnapshot, query, where } from "firebase/firestore";
 const CART_KEY = "dolce-cart-v1";
 const heroImage = "https://images.unsplash.com/photo-1464305795204-6f5bbfc7fb81?w=1400&auto=format&fit=crop&q=88";
 // Archivo exacto proporcionado por DOLCE. No se redibuja ni se edita el logotipo.
@@ -32,6 +34,10 @@ export default function Storefront() {
   const [ready,setReady] = useState(false);
   const [cartOpen,setCartOpen] = useState(false);
   const [mobileOpen,setMobileOpen] = useState(false);
+  const [navScrolled,setNavScrolled] = useState(false);
+  const [heroIndex,setHeroIndex] = useState(0);
+  const [reduceMotion,setReduceMotion] = useState(false);
+  const [orderServiceReady,setOrderServiceReady] = useState<boolean|null>(null);
   const [checkout,setCheckout] = useState(false);
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState("");
@@ -39,18 +45,64 @@ export default function Storefront() {
   const [delivery,setDelivery] = useState<DeliveryMethod>("Retiro");
   const [customer,setCustomer] = useState({ name:"",phone:"",address:"",requestedDate:"",notes:"" });
   useEffect(() => {
+    const onScroll = () => setNavScrolled(window.scrollY > 44);
+    onScroll(); window.addEventListener("scroll",onScroll,{passive:true});
+    return () => window.removeEventListener("scroll",onScroll);
+  },[]);
+  useEffect(()=>{
+    const media=window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange=()=>setReduceMotion(media.matches);
+    onChange();media.addEventListener("change",onChange);
+    return ()=>media.removeEventListener("change",onChange);
+  },[]);
+  useEffect(()=>{
+    let mounted=true;
+    fetch("/api/orders",{cache:"no-store"})
+      .then(r=>r.ok?r.json():{available:false})
+      .then(d=>{if(mounted)setOrderServiceReady(d.available===true);})
+      .catch(()=>{if(mounted)setOrderServiceReady(false);});
+    return()=>{mounted=false;};
+  },[]);
+  useEffect(() => {
     try { const stored=localStorage.getItem(CART_KEY); if(stored) setCart(JSON.parse(stored) as CartItem[]); } catch {}
     setReady(true);
-    if(demoMode) {
-      const sync=()=>{setProducts(getDemoProducts().filter(p=>p.active));setPromotions(getDemoPromotions().filter(p=>p.active));};
-      sync(); window.addEventListener("dolce-demo-change",sync);
-      return ()=>window.removeEventListener("dolce-demo-change",sync);
+    let alive=true;
+    const sync=()=>{setProducts(getDemoProducts().filter(p=>p.active));setPromotions(getDemoPromotions().filter(p=>p.active));};
+    if(demoMode){sync();window.addEventListener("dolce-demo-change",sync);}
+    // Show server-managed catalog whenever available, even when administrative setup is incomplete.
+    fetch("/api/catalog",{cache:"no-store"})
+      .then(r=>{if(!r.ok)throw new Error("No disponible");return r.json();})
+      .then(d=>{if(alive&&(d.mode==="live"||!demoMode)){setProducts(d.products);setPromotions(d.promotions||[]);}})
+      .catch(()=>{if(!demoMode&&alive)setError("No se pudo actualizar el catálogo.");});
+    // Firebase client-side reads use Firestore public-read rules; never grant public writes.
+    let stopProducts:(()=>void)|undefined;
+    let stopPromos:(()=>void)|undefined;
+    if(hasFirebaseClient&&demoMode){
+      const db=getFirestore(firebaseApp());
+      stopProducts=onSnapshot(query(collection(db,"products"),where("active","==",true),limit(100)),snapshot=>{
+        if(alive&&!snapshot.empty)setProducts(snapshot.docs.map(doc=>({...doc.data(),id:doc.id} as Product)));
+      },()=>{});
+      stopPromos=onSnapshot(query(collection(db,"promotions"),where("active","==",true),limit(30)),snapshot=>{
+        if(alive&&!snapshot.empty)setPromotions(snapshot.docs.map(doc=>({...doc.data(),id:doc.id} as Promotion)));
+      },()=>{});
     }
-    fetch("/api/catalog",{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error("No disponible");return r.json();}).then(d=>{setProducts(d.products);setPromotions(d.promotions||[]);}).catch(()=>setError("No se pudo actualizar el catálogo."));
+    return()=>{alive=false;if(demoMode)window.removeEventListener("dolce-demo-change",sync);stopProducts?.();stopPromos?.();};
   },[]);
   useEffect(()=>{ if(ready) localStorage.setItem(CART_KEY,JSON.stringify(cart)); },[cart,ready]);
   const visible = useMemo(()=> products.filter(p => (category==="Todos" || p.category===category) && (p.name+" "+p.description).toLocaleLowerCase("es").includes(search.toLocaleLowerCase("es"))),[products,category,search]);
-  const heroProduct=products.find(p=>p.featured&&p.active&&p.stock!==0)||products.find(p=>p.active&&p.stock!==0);
+  const featuredProducts=useMemo(()=>{
+    const active=products.filter(p=>p.active&&p.stock!==0);
+    const highlighted=active.filter(p=>p.featured);
+    return highlighted.length?highlighted:active;
+  },[products]);
+  const heroProduct=featuredProducts.length?featuredProducts[heroIndex%featuredProducts.length]:undefined;
+  useEffect(()=>{
+    if(featuredProducts.length<2||reduceMotion)return;
+    const timer=window.setInterval(()=>{
+      if(document.visibilityState==="visible")setHeroIndex(previous=>(previous+1)%featuredProducts.length);
+    },2000);
+    return()=>window.clearInterval(timer);
+  },[featuredProducts.length,reduceMotion]);
   const count=cart.reduce((sum,item)=>sum+item.quantity,0);
   const subtotal=cart.reduce((sum,item)=>sum+item.price*item.quantity,0);
   function add(product: Product) {
@@ -67,25 +119,18 @@ export default function Storefront() {
     setBusy(true);setError("");
     const payload={customer:{name:customer.name.trim(),phone:customer.phone.trim(),address:customer.address.trim(),method:delivery,requestedDate:customer.requestedDate||undefined},notes:customer.notes.trim(),items:cart.map(p=>({productId:p.productId,quantity:p.quantity}))};
     try {
-      let receipt: {id:string,total:number};
-      if(demoMode) {
-        if(payload.customer.name.length<2||payload.customer.phone.length<8||(delivery==="Entrega"&&payload.customer.address.length<8)) throw new Error("Completa los datos de contacto y entrega.");
-        receipt={id:"DEMO-"+Math.random().toString(36).slice(2,8).toUpperCase(),total:subtotal};
-        const record:Order={id:receipt.id,customer:payload.customer,items:cart.map(({productId,name,price,quantity})=>({productId,name,price,quantity})),subtotal,deliveryFee:0,total:subtotal,notes:payload.notes,status:"Nuevo",createdAt:new Date().toISOString()};
-        saveDemoOrders([record,...getDemoOrders()]);
-      } else {
-        const response=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
-        const result=await response.json();
-        if(!response.ok) throw new Error(result.error||"No pudimos procesar tu pedido");
-        receipt=result.order;
-      }
-      setSuccess(receipt);setCart([]);setCheckout(false);
+      if(orderServiceReady!==true)throw new Error("Los pedidos en línea aún no están disponibles. Tu carrito permanece guardado.");
+      const response=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error||"No se pudo registrar el pedido");
+      const receipt:{id:string,total:number}=result.order;
+            setSuccess(receipt);setCart([]);setCheckout(false);
     } catch(e) {setError(e instanceof Error?e.message:"Ocurrió un error");}
     finally {setBusy(false);}
   }
   const navigate=()=>setMobileOpen(false);
   return <main className="shop-page">
-    <header className="site-header">
+    <header className={"site-header"+(navScrolled?" is-scrolled":"")}>
       <a className="brand brand-original" href="#inicio" onClick={navigate} aria-label="Dolce Pastelería, inicio">
         <span className="brand-viewport"><img src={logoImage} alt="Dolce Pastelería, logotipo original" width={752} height={428} /></span>
       </a>
@@ -111,21 +156,35 @@ export default function Storefront() {
           <a className="button-primary" href="#catalogo">Explorar sabores <ArrowRight size={17}/></a>
           <a href="#especial" className="button-text">Pedidos especiales <ArrowRight size={17}/></a>
         </motion.div>
-        <div className="hero-bottom"><span><MapPin size={15}/> Repostería de Matagalpa</span><span className="vertical-line"/><span>Hecho para tus momentos</span></div>
       </div>
       <div className="hero-visual">
-        <motion.div initial={{opacity:0,scale:1.06,x:38}} animate={{opacity:1,scale:1,x:0}} transition={{duration:1.05,ease:[.18,.72,.25,1]}} className="hero-photo-frame">
-          <img src={heroProduct?.image||heroImage} alt={heroProduct?heroProduct.name:"Repostería artesanal de DOLCE"} className="hero-photo" fetchPriority="high"/>
+        <motion.div initial={{opacity:0,scale:1.035,x:25}} animate={{opacity:1,scale:1,x:0}} transition={{duration:.85}} className="hero-photo-frame">
+          <AnimatePresence initial={false} mode="wait">
+            <motion.img key={heroProduct?.id||"empty"} src={heroProduct?.image||heroImage}
+              alt={heroProduct?.name||"DOLCE Pastelería"} className="hero-photo" loading="eager"
+              initial={reduceMotion?false:{opacity:0,scale:1.055}} animate={{opacity:1,scale:1}}
+              exit={reduceMotion?undefined:{opacity:0,scale:1.035}}
+              transition={{duration:reduceMotion?0:.48,ease:"easeInOut"}}/>
+          </AnimatePresence>
           <div className="hero-photo-overlay"/>
-          <div className="hero-image-counter">01 <span>/ DOLCE FAVORITOS</span></div>
+          <div className="hero-image-counter">{String(featuredProducts.length?heroIndex%featuredProducts.length+1:1).padStart(2,"0")} <span>/ {String(Math.max(featuredProducts.length,1)).padStart(2,"0")}</span></div>
         </motion.div>
-        <motion.div initial={{opacity:0,y:35,rotate:-8}} animate={{opacity:1,y:0,rotate:-5}} transition={{delay:.62,type:"spring",stiffness:120,damping:15}} className="hero-sticker"><span>Hecho en<br/><strong>Matagalpa</strong></span><MapPin size={17}/></motion.div>
-        {heroProduct && <motion.button type="button" initial={{opacity:0,y:30}} animate={{opacity:1,y:0}} transition={{delay:.78,duration:.55}} className="hero-featured-product" onClick={()=>add(heroProduct)}>
-          <span className="hero-featured-label">UNA DELICIA PARA TI</span><span className="hero-featured-name">{heroProduct.name}</span><span className="hero-featured-bottom">{currency(heroProduct.price)} <span><Plus size={17}/></span></span>
-        </motion.button>}
-        <span className="hero-corner-script" aria-hidden="true">Dulces momentos<br/>desde nuestra ciudad.</span>
+        {heroProduct&&<AnimatePresence initial={false} mode="wait"><motion.button type="button"
+          key={heroProduct.id} initial={reduceMotion?false:{opacity:0,y:15}} animate={{opacity:1,y:0}}
+          exit={reduceMotion?undefined:{opacity:0,y:-9}} transition={{duration:reduceMotion?0:.32}}
+          className="hero-featured-product" onClick={()=>add(heroProduct)}
+          aria-label={"Agregar "+heroProduct.name+" al pedido"}>
+          <span className="hero-featured-label">PRODUCTO DESTACADO</span>
+          <span className="hero-featured-name">{heroProduct.name}</span>
+          <span className="hero-featured-bottom">{currency(heroProduct.price)} <span><Plus size={17}/></span></span>
+        </motion.button></AnimatePresence>}
+        {featuredProducts.length>1&&<div className="hero-carousel-controls" aria-label="Explorar productos destacados">
+          {featuredProducts.map((product,index)=><button type="button" key={product.id}
+            aria-label={"Mostrar "+product.name} aria-current={index===heroIndex%featuredProducts.length?"true":undefined}
+            className={"carousel-dot"+(index===heroIndex%featuredProducts.length?" active":"")}
+            onClick={()=>setHeroIndex(index)}/>)}
+        </div>}
       </div>
-      <div className="hero-scroll"><span>CONOCE NUESTROS SABORES</span><a href="#catalogo" aria-label="Ver productos"><ArrowDownRight size={21}/></a></div>
     </section>
     <section className="strip"><div className="strip-track"><span>Repostería de Matagalpa</span><span>✳</span><span>Sabores para compartir</span><span>✳</span><span>Momentos especiales</span><span>✳</span><span>Hecho con amor</span><span>✳</span><span>Recién hecho</span><span>✳</span><span>Para compartir</span><span>✳</span></div></section>
     <section id="catalogo" className="catalog section-shell">
@@ -139,10 +198,9 @@ export default function Storefront() {
     <section id="especial" className="special"><motion.div {...reveal} className="special-image"><img src={detailImage} alt="Selección de postres artesanales" loading="lazy"/><div className="special-seal">DOLCE<br/>♥<br/>MOMENTS</div></motion.div><motion.div {...reveal} className="special-copy"><span className="eyebrow"><span className="eyebrow-line"/> PARA TUS MOMENTOS</span><h2>Hay momentos que merecen <em>algo único.</em></h2><p>Cumpleaños, celebraciones o un simple «porque sí». Cuéntanos tu idea y hagamos que suceda.</p><a href="#catalogo" className="button-dark">Encontrar mi dulce <ArrowRight size={18}/></a><span className="special-decoration">✳</span></motion.div></section>
     <section className="closing-cta"><span className="eyebrow eyebrow-light">EL PLACER DE LO ARTESANAL</span><h2>Endulcemos tu <em>próximo momento.</em></h2><button onClick={()=>setCartOpen(true)} className="button-primary">Ver mi pedido <ShoppingBag size={18}/></button></section>
     <footer className="footer"><div className="footer-top"><a href="#inicio" className="footer-brand">dolce<span>.</span></a><span>Repostería hecha con amor, en Matagalpa.</span><a href="/admin" className="footer-admin">Acceso al equipo <ArrowRight size={14}/></a></div><div className="footer-bottom"><span>© {new Date().getFullYear()} DOLCE Repostería</span><span>El ingrediente secreto siempre es el cariño ♥</span></div></footer>
-    {demoMode&&<div className="demo-ribbon">Vista de demostración · pedidos de prueba</div>}
     <AnimatePresence>{cartOpen&&<><motion.div className="drawer-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>{setCartOpen(false);setCheckout(false);setError("");}}/><motion.aside className="cart-drawer" initial={{x:"100%"}} animate={{x:0}} exit={{x:"100%"}} transition={{type:"spring",damping:28,stiffness:260}} aria-label="Tu pedido"><div className="drawer-header"><div><span className="eyebrow">ALGO DULCE ESTÁ EN CAMINO</span><h2>{success?"¡Listo!":checkout?"Finaliza tu pedido":"Tu cajita dulce"} <span>♥</span></h2></div><button type="button" aria-label="Cerrar" onClick={()=>{setCartOpen(false);setCheckout(false);setSuccess(null);setError("");}}><X size={23}/></button></div>
-      {success ? <div className="order-success"><span className="success-icon"><Check size={32}/></span><h3>{demoMode?"Pedido de prueba registrado":"¡Recibimos tu pedido!"}</h3><p>{demoMode?"Puedes verlo en el panel de demostración. No se envió a DOLCE.":"Tu solicitud está registrada. El equipo de DOLCE confirmará los detalles y la entrega."}</p><strong>#{success.id}</strong><p>Total de productos: {currency(success.total)}. El envío, si corresponde, se cotiza por separado.</p><button className="button-dark wide" onClick={()=>{setCartOpen(false);setSuccess(null);}}>Seguir explorando</button></div> :
-      checkout ? <form className="checkout-form" onSubmit={submitOrder}><button type="button" className="back-link" onClick={()=>setCheckout(false)}><ArrowLeft size={16}/> Volver a mi carrito</button><div className="field-row"><label>Nombre completo<input required minLength={2} maxLength={100} value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})} placeholder="¿A nombre de quién?"/></label><label>Teléfono / WhatsApp<input required minLength={8} maxLength={22} value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})} placeholder="8888 8888" type="tel"/></label></div><span className="form-label">¿Cómo lo recibirás?</span><div className="delivery-toggle"><button type="button" className={delivery==="Retiro"?"active":""} onClick={()=>setDelivery("Retiro")}>Retirar en tienda</button><button type="button" className={delivery==="Entrega"?"active":""} onClick={()=>setDelivery("Entrega")}>Entrega a domicilio</button></div>{delivery==="Entrega"&&<label>Dirección de entrega<input required minLength={8} maxLength={240} value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})} placeholder="Barrio, dirección y referencia"/></label>}<label>Fecha deseada <span>(opcional)</span><input type="date" min={new Date().toISOString().slice(0,10)} value={customer.requestedDate} onChange={e=>setCustomer({...customer,requestedDate:e.target.value})}/></label><label>Dedicatoria o indicaciones <span>(opcional)</span><textarea rows={3} maxLength={500} value={customer.notes} onChange={e=>setCustomer({...customer,notes:e.target.value})} placeholder="¿Algún detalle especial?"/></label><p className="form-note">{demoMode ? "Esta es una simulación: los datos se guardan solo en este navegador y el pedido NO llega al negocio." : "DOLCE confirmará disponibilidad, fecha y, si aplica, el costo de entrega. No se cobra en línea."}</p>{error&&<div className="form-error" role="alert">{error}</div>}<div className="checkout-bottom"><div className="cart-total"><span>Total de productos</span><strong>{currency(subtotal)}</strong></div><button type="submit" className="button-dark wide" disabled={busy}>{busy?"Registrando...":demoMode?"Registrar pedido de prueba":"Enviar mi pedido"} <ArrowRight size={18}/></button></div></form> :
+      {success ? <div className="order-success"><span className="success-icon"><Check size={32}/></span><h3>¡Recibimos tu pedido!</h3><p>Tu solicitud quedó registrada. El equipo de DOLCE confirmará los detalles y la entrega.</p><strong>#{success.id}</strong><p>Total de productos: {currency(success.total)}. El envío, si corresponde, se cotiza por separado.</p><button className="button-dark wide" onClick={()=>{setCartOpen(false);setSuccess(null);}}>Seguir explorando</button></div> :
+      checkout ? <form className="checkout-form" onSubmit={submitOrder}><button type="button" className="back-link" onClick={()=>setCheckout(false)}><ArrowLeft size={16}/> Volver a mi carrito</button><div className="field-row"><label>Nombre completo<input required minLength={2} maxLength={100} value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})} placeholder="¿A nombre de quién?"/></label><label>Teléfono / WhatsApp<input required minLength={8} maxLength={22} value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})} placeholder="8888 8888" type="tel"/></label></div><span className="form-label">¿Cómo lo recibirás?</span><div className="delivery-toggle"><button type="button" className={delivery==="Retiro"?"active":""} onClick={()=>setDelivery("Retiro")}>Retirar en tienda</button><button type="button" className={delivery==="Entrega"?"active":""} onClick={()=>setDelivery("Entrega")}>Entrega a domicilio</button></div>{delivery==="Entrega"&&<label>Dirección de entrega<input required minLength={8} maxLength={240} value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})} placeholder="Barrio, dirección y referencia"/></label>}<label>Fecha deseada <span>(opcional)</span><input type="date" min={new Date().toISOString().slice(0,10)} value={customer.requestedDate} onChange={e=>setCustomer({...customer,requestedDate:e.target.value})}/></label><label>Dedicatoria o indicaciones <span>(opcional)</span><textarea rows={3} maxLength={500} value={customer.notes} onChange={e=>setCustomer({...customer,notes:e.target.value})} placeholder="¿Algún detalle especial?"/></label><p className="form-note">{orderServiceReady===false?"Los pedidos en línea aún no están disponibles. Puedes conservar los productos en tu carrito.":"DOLCE confirmará disponibilidad, fecha y, si aplica, el costo de entrega. No se cobra en línea."}</p>{error&&<div className="form-error" role="alert">{error}</div>}<div className="checkout-bottom"><div className="cart-total"><span>Total de productos</span><strong>{currency(subtotal)}</strong></div><button type="submit" className="button-dark wide" disabled={busy||orderServiceReady!==true}>{busy?"Registrando...":orderServiceReady===null?"Verificando pedidos...":orderServiceReady?"Enviar mi pedido":"Pedidos en línea no disponibles"} <ArrowRight size={18}/></button></div></form> :
       <><div className="cart-items">{cart.length?cart.map(item=><div className="cart-item" key={item.productId}><img src={item.image} alt=""/><div className="cart-item-details"><h3>{item.name}</h3><span>{currency(item.price)}</span><div className="qty-controls"><button aria-label="Restar" onClick={()=>quantity(item.productId,-1)}><Minus size={13}/></button><span>{item.quantity}</span><button aria-label="Sumar" onClick={()=>quantity(item.productId,1)}><Plus size={13}/></button></div></div><button className="remove-item" aria-label="Eliminar producto" onClick={()=>setCart(old=>old.filter(i=>i.productId!==item.productId))}><Trash2 size={17}/></button></div>):<div className="cart-empty"><ShoppingBag size={42}/><h3>Tu carrito espera algo delicioso</h3><p>Elige tus favoritos y comienza tu pedido.</p><button className="button-dark" onClick={()=>setCartOpen(false)}>Explorar delicias <ArrowRight size={17}/></button></div>}</div>{cart.length>0&&<div className="cart-footer"><div className="cart-total"><span>Subtotal</span><strong>{currency(subtotal)}</strong></div><p>Entrega sujeta a confirmación. No incluye envío.</p><button className="button-dark wide" onClick={()=>{setCheckout(true);setError("");}}>Continuar pedido <ArrowRight size={18}/></button></div>}</>}
     </motion.aside></>}</AnimatePresence>
   </main>;

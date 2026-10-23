@@ -3,9 +3,12 @@ import { getBackend } from "@/lib/firebase-admin";
 import { orderSchema } from "@/lib/validation";
 import type { Product } from "@/lib/types";
 export const runtime = "nodejs";
+export async function GET() {
+  return NextResponse.json({ available: getBackend() !== null }, { headers: { "Cache-Control":"no-store" } });
+}
 export async function POST(request: Request) {
   const backend = getBackend();
-  if (!backend) return NextResponse.json({ error: "Los pedidos reales aún no están habilitados. Esta es una demostración." }, { status: 503 });
+  if (!backend) return NextResponse.json({ error: "Los pedidos en línea aún no están disponibles. Inténtalo más adelante." }, { status: 503 });
   let payload: unknown;
   try { payload = await request.json(); } catch { return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 }); }
   const result = orderSchema.safeParse(payload);

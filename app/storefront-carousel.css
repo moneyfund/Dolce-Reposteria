@@ -1,0 +1,54 @@
+/* Fixed beige navigation that transitions to a transparent glass surface on scroll. */
+html{scroll-padding-top:125px}
+.shop-page section[id]{scroll-margin-top:125px}
+.shop-page .site-header{
+ position:fixed!important;top:12px!important;left:3%!important;width:94%!important;
+ height:88px;min-height:0;border-radius:19px;padding:4px 2.6%!important;
+ z-index:30;background:rgba(241,228,205,.97)!important;
+ border:1px solid rgba(195,168,127,.48);box-shadow:0 14px 42px rgba(28,17,18,.12);
+ backdrop-filter:blur(18px) saturate(1.1);-webkit-backdrop-filter:blur(18px) saturate(1.1);
+ transition:background .35s ease,border-color .35s ease,box-shadow .35s ease,top .35s ease
+}
+.shop-page .site-header.is-scrolled{
+ top:9px!important;background:rgba(246,234,216,.17)!important;
+ border-color:rgba(222,211,194,.46);box-shadow:0 11px 35px rgba(23,13,18,.09);
+ backdrop-filter:blur(22px) saturate(1.35);-webkit-backdrop-filter:blur(22px) saturate(1.35)
+}
+.shop-page .site-header.is-scrolled .nav-links a{color:#362c2f;text-shadow:0 1px 4px #ffffffb0}
+.shop-page .site-header.is-scrolled .header-order{background:rgba(84,40,57,.9)}
+.shop-page .site-header .nav-links a{color:#372b2c}
+.shop-page .site-header .brand-original,.shop-page .site-header .brand-viewport{height:79px}
+.shop-page .hero.dolce-hero{padding-top:145px!important;padding-bottom:81px!important}
+.shop-page .hero-visual{isolation:isolate}
+.shop-page .hero-photo-frame{position:relative;isolation:isolate}
+.shop-page .hero-photo-frame .hero-photo{
+ position:absolute;inset:0;width:100%;height:100%;max-width:none;
+ object-fit:cover;object-position:center;border-radius:12px
+}
+.shop-page .hero-photo-frame .hero-photo-overlay{position:absolute;inset:0;pointer-events:none}
+.shop-page .hero-featured-product{z-index:8;min-height:110px}
+.shop-page .hero-image-counter{z-index:5}
+.shop-page .hero-carousel-controls{position:absolute;z-index:8;bottom:27px;left:36px;display:flex;gap:9px;align-items:center;padding:7px 11px;background:rgba(39,18,27,.52);border-radius:999px;backdrop-filter:blur(8px)}
+.shop-page .carousel-dot{height:7px;width:7px;border:0;border-radius:50%;background:rgba(255,255,255,.52);padding:0;transition:width .25s,background .25s}
+.shop-page .carousel-dot.active{width:22px;background:#f1c989;border-radius:6px}
+.shop-page .carousel-dot:focus-visible{outline:2px solid white;outline-offset:4px}
+@media(max-width:800px){
+ .shop-page .site-header{height:78px;top:9px!important;left:3%!important;width:94%!important;padding:4px 4%!important}
+ .shop-page .site-header .brand-original,.shop-page .site-header .brand-viewport{height:69px}
+ .shop-page .nav-links{top:74px;left:0;right:0}
+ .shop-page .hero.dolce-hero{padding-top:135px!important}
+ .shop-page .hero-carousel-controls{left:18px}
+}
+@media(max-width:600px){
+ .shop-page .site-header{height:70px;top:7px!important;padding:3px 3.5%!important;border-radius:15px}
+ .shop-page .site-header.is-scrolled{top:5px!important}
+ .shop-page .site-header .brand-original,.shop-page .site-header .brand-viewport{height:62px}
+ .shop-page .nav-links{top:66px}
+ .shop-page .hero.dolce-hero{padding-top:110px!important;padding-bottom:43px!important}
+ .shop-page .hero-visual{margin-top:16px}
+ .shop-page .hero-carousel-controls{left:20px;bottom:36px}
+ .shop-page .hero-visual .hero-featured-product{min-height:90px}
+}
+@media(prefers-reduced-motion:reduce){
+ .shop-page .site-header,.shop-page .carousel-dot{transition:none!important}
+}
