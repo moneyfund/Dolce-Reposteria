@@ -1,5 +1,41 @@
 # DOLCE Digital
 
-Plataforma comercial y administrativa para DOLCE Repostería.
+Tienda pública + DOLCE Manager para DOLCE Repostería. Next.js 15, React 19, TypeScript, Tailwind CSS, Motion, Firebase y Vercel.
 
-Construida con Next.js, TypeScript, Tailwind CSS y Firebase.
+## Incluido en la primera versión
+
+- Tienda editorial responsive: categorías, búsqueda, catálogo, carrito persistente, modalidad entrega/retiro, fecha, dedicatoria y registro de pedidos.
+- Dashboard (/admin): métricas, gráfico semanal, pedidos con cambios de estado, clientes y gestión de productos/stock.
+- Backend: API de pedidos que valida precios e inventario en servidor con Firestore y transacciones. API de administración protegida con Firebase Authentication y rol de personal.
+- Demo sin Firebase: catálogo, pedidos y edición local en el navegador. **No son pedidos reales**.
+
+Las fotografías, nombres, clientes y precios iniciales son demostrativos y deben sustituirse por información autorizada por DOLCE.
+
+## Inicio
+
+Requisitos: Node.js 20+.
+
+1. npm install
+2. npm run dev
+3. Abre http://localhost:3000 y http://localhost:3000/admin
+4. npm run build y npm run typecheck
+
+## Activación de Firebase
+
+Configura en Vercel las variables del archivo .env.example.
+
+Variables públicas: NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, NEXT_PUBLIC_FIREBASE_PROJECT_ID, NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET, NEXT_PUBLIC_FIREBASE_APP_ID.
+
+Solo servidor: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY. Nunca compartas la clave privada por chat ni la publiques en GitHub. Configúrala directamente en las variables protegidas de Vercel.
+
+Activa Cloud Firestore y Authentication / Google. Aplica firestore.rules en Firebase. Para autorizar a un administrador, crea desde la consola Firebase el documento staff/{uid} con role: "owner" o "admin", donde uid corresponde al usuario que inició sesión con Google. Las APIs verifican este rol del lado servidor; la tienda no concede permisos al usuario final.
+
+Colecciones: products/{id}, orders/{id}, staff/{uid}.
+
+En producción el catálogo se inicia vacío y debe cargarse con precios oficiales. El cliente ve que el envío no está incluido en el subtotal y queda sujeto a confirmación. No hay pagos en línea.
+
+## Antes de habilitar atención real
+
+Confirmar marca, fotos, precio, cobertura, forma de cobro, horario, políticas de cancelación, privacidad, aviso de pedidos y protección contra automatización/abuso. Revisar permisos en Firebase, probar el flujo de reserva de stock y establecer un mecanismo de notificación al negocio.
+
+Este desarrollo constituye un prototipo funcional de transferencia digital para la tesis UNAN. No demuestra por sí solo una mejora cuantificada de las ventas o posicionamiento.

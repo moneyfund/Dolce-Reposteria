@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function staffMember() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+        && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role in ['owner', 'admin'];
+    }
+    match /products/{productId} {
+      allow read: if resource.data.active == true || staffMember();
+      // Product mutation goes through authenticated server APIs.
+      allow write: if false;
+    }
+    match /staff/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /orders/{orderId} {
+      // Orders contain personal data and are server-only.
+      allow read, write: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
