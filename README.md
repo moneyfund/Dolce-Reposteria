@@ -1,79 +1,63 @@
-# DOLCE Digital
+# DOLCE Digital — Pastelería de Matagalpa
 
-Tienda pública + DOLCE Manager para DOLCE Repostería. Next.js 15, React 19, TypeScript, Tailwind CSS, Motion, Firebase y Vercel.
+Plataforma de tienda pública y panel DOLCE Manager. Next.js, React, TypeScript, Tailwind, Motion, Firebase Authentication, Cloud Firestore, Storage y Vercel.
 
-## Incluido en la primera versión
+## Arquitectura vigente (sin Firebase Admin SDK)
 
-- Tienda editorial responsive: categorías, búsqueda, catálogo, carrito persistente, modalidad entrega/retiro, fecha, dedicatoria y registro de pedidos.
-- Dashboard (/admin): métricas, gráfico semanal, pedidos con cambios de estado, clientes y gestión de productos/stock y campañas promocionales editables.
-- Backend: API de pedidos que valida precios e inventario en servidor con Firestore y transacciones. API de administración protegida con Firebase Authentication y rol de personal.
-- Modo de demostración controlado explícitamente por `NEXT_PUBLIC_DOLCE_LIVE_MODE` (por defecto desactivado el modo real): catálogo, pedidos y edición local en el navegador. **No son pedidos reales**. La configuración pública de Firebase por sí sola no habilita pedidos reales.
+- **Tienda:** consulta en tiempo real los productos `active=true` y promociones públicas. El carrito se conserva en el navegador. El checkout valida nombres, precios y existencias desde Firestore antes de escribir la solicitud.
+- **Autenticación de clientes:** Firebase Authentication anónima permite comprar sin crear contraseña. Cada pedido se asocia al UID temporal del cliente. Hay que habilitar **Anonymous** en Firebase Console → Authentication → Sign-in method. Google debe permanecer habilitado para el personal de DOLCE.
+- **Pedidos reales:** `orders/{id}` recibe `ownerUid`, `customer`, `items`, `subtotal`, `deliveryFee`, `total`, `notes`, `status=Nuevo` y `createdAt=serverTimestamp()`. La regla valida los precios contra los documentos originales de `products`; **no confía en el subtotal del navegador**. Máximo 5 productos distintos por pedido y 10 unidades de cada uno.
+- **Manager:** login Google; autoriza solo si existe `staff/{uid}` con `role: "owner"` o `role: "admin"`. Escucha `orders`, `products` y `promotions` en tiempo real. El personal edita el catálogo, campañas y estados de pedidos.
+- **Inventario:** el checkout verifica las existencias pero **no reserva ni descuenta stock automáticamente**. El equipo debe confirmar disponibilidad y actualizar el inventario al gestionar pedidos; evitar prometer una reserva automática antes de implementar transacciones de inventario.
+- **Storage:** mantiene los permisos de `storage.rules` para fotos públicas de catálogo/promociones y adjuntos privados. La carga de fotos todavía usa URL HTTPS, no hay interfaz de subida directa.
 
-Las fotografías, nombres, clientes y precios iniciales son demostrativos y deben sustituirse por información autorizada por DOLCE.
+## Configuración inicial
 
-## Inicio
+1. En [Firebase Console](https://console.firebase.google.com/project/dolce-reposteria) habilita Firestore, Authentication **Google + Anonymous** y Storage.
+2. Publica manualmente el contenido de [`firestore.rules`](./firestore.rules) en **Firestore Database → Reglas**, sustituyendo las reglas anteriores. Las reglas deben estar publicadas antes de intentar pedidos, edición de productos o dashboard.
+3. Mantén sincronizadas las reglas [`storage.rules`](./storage.rules) en **Storage → Reglas**.
+4. Para registrar al propietario, entra en [`/admin/acceso`](https://dolce-reposteria.vercel.app/admin/acceso), inicia sesión con Google y copia tu UID. Crea el documento `staff/{uid}` desde Firebase Console con campo de texto `role` = `owner`. Los visitantes no pueden editar `staff`.
+5. En DOLCE Manager, inicia sesión con esa misma cuenta y crea al menos **un producto real, activo y con precio entero en C$**. No hay catálogo ficticio ni órdenes de prueba en producción.
+6. Verifica un pedido real pequeño desde la web pública, comprueba que aparece en `orders` y en DOLCE Manager, y confirma el flujo antes de publicitar la tienda.
 
-Requisitos: Node.js 20+.
+## Vercel
 
-1. npm install
-2. npm run dev
-3. Abre http://localhost:3000 y http://localhost:3000/admin
-4. npm run build y npm run typecheck
+Mantén las variables **públicas** existentes:
 
-## Activación de Firebase
+```text
+NEXT_PUBLIC_FIREBASE_API_KEY
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+NEXT_PUBLIC_FIREBASE_PROJECT_ID
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+NEXT_PUBLIC_FIREBASE_APP_ID
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+```
 
-Configura en Vercel las variables del archivo .env.example.
+La app **ya no depende** de `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_PROJECT_ID` ni `NEXT_PUBLIC_DOLCE_LIVE_MODE`. No es necesario generar una clave de cuenta de servicio para pedidos.
 
-Variables públicas: NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN, NEXT_PUBLIC_FIREBASE_PROJECT_ID, NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET, NEXT_PUBLIC_FIREBASE_APP_ID, NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID, NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID.
+## Publicación y desarrollo
 
-Solo servidor: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY. Nunca compartas la clave privada por chat ni la publiques en GitHub. Configúrala directamente en las variables protegidas de Vercel.
+```bash
+npm install
+npm run dev
+npm run typecheck
+npm run build
+```
 
-Activa Cloud Firestore y Authentication / Google. Aplica firestore.rules en Firebase. Para autorizar a un administrador, crea desde la consola Firebase el documento staff/{uid} con role: "owner" o "admin", donde uid corresponde al usuario que inició sesión con Google. Las APIs verifican este rol del lado servidor; la tienda no concede permisos al usuario final.
+Los archivos `firebase.json` y `.firebaserc` también permiten desplegar reglas con Firebase CLI desde una sesión autorizada:
 
-Colecciones: products/{id}, promotions/{id}, orders/{id}, staff/{uid}.
+```bash
+firebase login
+firebase deploy --only firestore:rules,storage --project dolce-reposteria
+```
 
-Antes de lanzar operaciones reales: configurar credenciales privadas, cargar un usuario en staff, publicar firestore.rules, verificar pedidos/estados en pruebas y finalmente poner NEXT_PUBLIC_DOLCE_LIVE_MODE=true en Vercel y volver a desplegar. El ID de Analytics es opcional; la analítica no se activa hasta configurar el consentimiento y la política correspondiente.
+El despliegue de Next.js se gestiona automáticamente mediante GitHub → Vercel. **El despliegue de Vercel no publica reglas Firebase**.
 
-En modo real, el catálogo se inicia vacío y debe cargarse con precios oficiales. El cliente ve que el envío no está incluido en el subtotal y queda sujeto a confirmación. No hay pagos en línea.
+## Límites de seguridad antes de difusión masiva
 
-## Antes de habilitar atención real
+La validación de precio, cantidades, identidad y rol se aplica con Security Rules (no solamente con botones de la UI). Firestore no tiene limitación de frecuencia de pedidos basada en IP integrada; para tráfico público a escala implementar Firebase App Check, límites antiabuso y monitorización de pedidos. No habilitar escrituras generales en Firestore. Los pedidos siguen pendientes de confirmación por el negocio; no procesan pagos ni cobran entrega en línea.
 
-Confirmar marca, fotos, precio, cobertura, forma de cobro, horario, políticas de cancelación, privacidad, aviso de pedidos y protección contra automatización/abuso. Revisar permisos en Firebase, probar el flujo de reserva de stock y establecer un mecanismo de notificación al negocio.
+## Contexto académico
 
-Este desarrollo constituye un prototipo funcional de transferencia digital para la tesis UNAN. No demuestra por sí solo una mejora cuantificada de las ventas o posicionamiento.
-
-## Alta segura del propietario
-
-1. Antes de activar modo real, abre /admin/acceso e inicia sesión con tu cuenta Google autorizada en Firebase Authentication.
-2. Copia tu UID y crea en Firestore `staff/{uid}` con el campo `role` (string) igual a `owner`.
-3. En Vercel configura `FIREBASE_CLIENT_EMAIL` y `FIREBASE_PRIVATE_KEY` directamente desde una cuenta de servicio de Firebase, sin compartir el archivo JSON o la clave por chat.
-4. Publica las reglas del repositorio y comprueba en Manager la lectura pública de Firestore.
-5. Una vez revisadas las operaciones con datos reales, configura `NEXT_PUBLIC_DOLCE_LIVE_MODE=true` y vuelve a desplegar.
-
-## Storage: fotografías y adjuntos
-
-Publica `storage.rules` manualmente en Firebase Console > Storage > Reglas. Estas reglas no se publican automáticamente al hacer push a GitHub.
-
-Rutas admitidas:
-- `catalog/products/{productId}/{fileName}`: imágenes públicas del catálogo, carga/edición/borrado solo por usuarios con `staff/{uid}.role` en `owner` o `admin`.
-- `catalog/promotions/{promotionId}/{fileName}`: banners públicos, edición solo por equipo autorizado.
-- `order-references/{orderId}/{fileName}`: referencias privadas de personalización, solo equipo autorizado. Cargas de clientes sin iniciar sesión **todavía no habilitadas**.
-
-Subidas: JPEG, PNG o WebP de hasta 8 MiB. El panel de esta versión todavía utiliza campos de URL para las imágenes; la carga directa al bucket requiere conectar el formulario de upload a Firebase Storage.
-
-Las reglas consultan roles desde Firestore; al publicarlas, la consola de Firebase puede solicitar autorizar la vinculación IAM entre Storage y Firestore. Verifica los permisos antes de hacer pruebas. Los enlaces de descarga públicos con token deben tratarse como compartibles aunque posteriormente se oculte un producto.
-
-Las imágenes privadas de pedidos no deben exponerse a través de enlaces de descarga permanentes sin un mecanismo de autorización adicional.
-
-## Pedidos reales: diagnóstico de conectividad (octubre 2026)
-
-El endpoint público `GET /api/orders` responde `{ "available": true }` solamente si `NEXT_PUBLIC_DOLCE_LIVE_MODE=true`, Firebase Admin SDK tiene credenciales válidas, Firestore responde y existe al menos un producto con `active: true`. Un valor `false` deshabilita correctamente el envío de pedidos de clientes.
-
-Para habilitarlo, en **Vercel > Project Settings > Environment Variables** añade exclusivamente allí `FIREBASE_CLIENT_EMAIL` y `FIREBASE_PRIVATE_KEY`, extraídas de Firebase Console > Project settings > Service accounts > Generate new private key. Son valores secretos de servidor; no deben llevar el prefijo `NEXT_PUBLIC_`, enviarse por chat ni subirse al repositorio. La clave puede guardarse con saltos de línea reales o literales `\\n`; el backend admite ambos. En el mismo panel comprueba `FIREBASE_PROJECT_ID=dolce-reposteria`.
-
-Después, despliega nuevamente, registra productos reales activos desde el panel autorizado y verifica `/api/orders`. No cambies Firestore Security Rules para habilitar escrituras públicas: el servidor valida precios y existencias antes de registrar pedidos.
-
-El logo de la tienda se mantiene sin redibujar; la integración beige en el navbar utiliza `mix-blend-mode:multiply` para ocultar visualmente el rectángulo blanco de la imagen. Las imágenes destacadas cambian cada cuatro segundos.
-
-### Activación final sin simulaciones
-En este despliegue, `NEXT_PUBLIC_DOLCE_LIVE_MODE` está en `false`. Una vez que Vercel tenga las credenciales secretas, que el rol `staff/{uid}` esté creado y que el catálogo real esté registrado, cambiar la variable a `true` en las variables del proyecto y efectuar un nuevo despliegue. **La API rechaza pedidos mientras el panel esté en demostración**, para que pedidos reales nunca queden fuera del Manager. El panel público bloquea el envío hasta comprobar esta condición.
+Implementación de la propuesta de transferencia digital para la tesis UNAN de DOLCE Pastelería. Una aplicación operativa no demuestra por sí misma efectos estadísticos sobre ventas o posicionamiento: se requiere medición posterior.

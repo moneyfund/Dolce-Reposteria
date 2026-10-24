@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowDownRight, ArrowLeft, ArrowRight, Check, ChevronDown, Heart, Instagram, MapPin, Menu, Minus, Plus, Search, ShoppingBag, Sparkles, Star, Trash2, X } from "lucide-react";
 import { categories, currency, type CartItem, type Category, type Product, type DeliveryMethod, type Promotion } from "@/lib/types";
-import { demoProducts, demoPromotions } from "@/lib/demo";
-import { demoMode, getDemoProducts, getDemoPromotions } from "@/lib/demo-storage";
+
+import { checkCatalogReady, createCustomerOrder, readableError } from "@/lib/firestore-commerce";
 import { firebaseApp, hasFirebaseClient } from "@/lib/firebase-client";
 import { collection, getFirestore, limit, onSnapshot, query, where } from "firebase/firestore";
 const CART_KEY = "dolce-cart-v1";
@@ -26,8 +26,8 @@ function ProductCard({ product, onAdd, index }: { product: Product; onAdd: (p: P
   </motion.article>;
 }
 export default function Storefront() {
-  const [products,setProducts] = useState<Product[]>(demoProducts);
-  const [promotions,setPromotions] = useState<Promotion[]>(demoPromotions);
+  const [products,setProducts] = useState<Product[]>([]);
+  const [promotions,setPromotions] = useState<Promotion[]>([]);
   const [category,setCategory] = useState<string>("Todos");
   const [search,setSearch] = useState("");
   const [cart,setCart] = useState<CartItem[]>([]);
@@ -57,42 +57,30 @@ export default function Storefront() {
     return ()=>media.removeEventListener("change",onChange);
   },[]);
   useEffect(()=>{
-    let mounted=true;
-    fetch("/api/orders",{cache:"no-store"})
-      .then(r=>r.ok?r.json():{available:false})
-      .then(d=>{
-        if(mounted){
-          setOrderServiceReady(d.available===true);
-          setServiceNotice(d.available===true?"":"El servicio de pedidos está en configuración. Tu carrito permanece guardado.");
-        }
-      })
-      .catch(()=>{if(mounted){setOrderServiceReady(false);setServiceNotice("No se pudo verificar el servicio de pedidos.");}});
-    return()=>{mounted=false;};
+    let active=true;
+    if(!hasFirebaseClient){setOrderServiceReady(false);setServiceNotice("Firebase todavía no está configurado.");return;}
+    checkCatalogReady().then(ok=>{
+      if(active){setOrderServiceReady(ok);setServiceNotice(ok?"":"DOLCE todavía no tiene productos reales disponibles para pedidos.");}
+    }).catch(e=>{
+      if(active){setOrderServiceReady(false);setServiceNotice(readableError(e));}
+    });
+    return()=>{active=false;};
   },[]);
-  useEffect(() => {
-    try { const stored=localStorage.getItem(CART_KEY); if(stored) setCart(JSON.parse(stored) as CartItem[]); } catch {}
+  useEffect(()=>{
+    try {const saved=localStorage.getItem(CART_KEY);if(saved)setCart(JSON.parse(saved) as CartItem[]);}catch{}
     setReady(true);
-    let alive=true;
-    const sync=()=>{setProducts(getDemoProducts().filter(p=>p.active));setPromotions(getDemoPromotions().filter(p=>p.active));};
-    if(demoMode){sync();window.addEventListener("dolce-demo-change",sync);}
-    // Show server-managed catalog whenever available, even when administrative setup is incomplete.
-    fetch("/api/catalog",{cache:"no-store"})
-      .then(r=>{if(!r.ok)throw new Error("No disponible");return r.json();})
-      .then(d=>{if(alive&&(d.mode==="live"||!demoMode)){setProducts(d.products);setPromotions(d.promotions||[]);}})
-      .catch(()=>{if(!demoMode&&alive)setError("No se pudo actualizar el catálogo.");});
-    // Firebase client-side reads use Firestore public-read rules; never grant public writes.
-    let stopProducts:(()=>void)|undefined;
-    let stopPromos:(()=>void)|undefined;
-    if(hasFirebaseClient&&demoMode){
-      const db=getFirestore(firebaseApp());
-      stopProducts=onSnapshot(query(collection(db,"products"),where("active","==",true),limit(100)),snapshot=>{
-        if(alive&&!snapshot.empty)setProducts(snapshot.docs.map(doc=>({...doc.data(),id:doc.id} as Product)));
-      },()=>{});
-      stopPromos=onSnapshot(query(collection(db,"promotions"),where("active","==",true),limit(30)),snapshot=>{
-        if(alive&&!snapshot.empty)setPromotions(snapshot.docs.map(doc=>({...doc.data(),id:doc.id} as Promotion)));
-      },()=>{});
-    }
-    return()=>{alive=false;if(demoMode)window.removeEventListener("dolce-demo-change",sync);stopProducts?.();stopPromos?.();};
+    if(!hasFirebaseClient)return;
+    const db=getFirestore(firebaseApp());
+    const unsubProducts=onSnapshot(query(collection(db,"products"),where("active","==",true),limit(100)),
+      snap=>{
+        setProducts(snap.docs.map(d=>({...d.data(),id:d.id} as Product)));
+        setOrderServiceReady(!snap.empty);
+        setServiceNotice(snap.empty?"DOLCE todavía no tiene productos publicados para recibir pedidos.":"");
+      },e=>{setError(readableError(e));setOrderServiceReady(false);setServiceNotice(readableError(e));});
+    const unsubPromotions=onSnapshot(query(collection(db,"promotions"),where("active","==",true),limit(30)),
+      snap=>setPromotions(snap.docs.map(d=>({...d.data(),id:d.id} as Promotion))),
+      ()=>setPromotions([]));
+    return()=>{unsubProducts();unsubPromotions();};
   },[]);
   useEffect(()=>{ if(ready) localStorage.setItem(CART_KEY,JSON.stringify(cart)); },[cart,ready]);
   useEffect(()=>{
@@ -126,19 +114,21 @@ export default function Storefront() {
     setCheckout(false);setCartOpen(true);
   }
   function quantity(id:string, delta:number) { setCart(prev=>prev.map(item=>item.productId===id?{...item,quantity:Math.max(0,Math.min(30,item.quantity+delta))}:item).filter(item=>item.quantity>0)); }
-  async function submitOrder(event: React.FormEvent<HTMLFormElement>) {
+  async function submitOrder(event:React.FormEvent<HTMLFormElement>){
     event.preventDefault();if(!cart.length||busy)return;
     setBusy(true);setError("");
-    const payload={customer:{name:customer.name.trim(),phone:customer.phone.trim(),address:customer.address.trim(),method:delivery,requestedDate:customer.requestedDate||undefined},notes:customer.notes.trim(),items:cart.map(p=>({productId:p.productId,quantity:p.quantity}))};
-    try {
-      if(orderServiceReady!==true)throw new Error("Los pedidos en línea aún no están disponibles. Tu carrito permanece guardado.");
-      const response=await fetch("/api/orders",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
-      const result=await response.json();
-      if(!response.ok)throw new Error(result.error||"No se pudo registrar el pedido");
-      const receipt:{id:string,total:number}=result.order;
+    try{
+      if(orderServiceReady!==true)throw new Error("No hay productos disponibles para pedidos todavía.");
+      const receipt=await createCustomerOrder({
+        customer:{
+          name:customer.name,phone:customer.phone,address:customer.address,
+          method:delivery,requestedDate:customer.requestedDate,
+        },
+        notes:customer.notes,items:cart,
+      });
       setSuccess(receipt);setCart([]);setCheckout(false);
-    } catch(e) {setError(e instanceof Error?e.message:"Ocurrió un error");}
-    finally {setBusy(false);}
+    }catch(e){setError(readableError(e));}
+    finally{setBusy(false);}
   }
   const navigate=()=>setMobileOpen(false);
   return <main className="shop-page">

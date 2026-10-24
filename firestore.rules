@@ -1,27 +1,110 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
     function staffMember() {
-      return request.auth != null
+      return signedIn()
         && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
-        && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role in ['owner', 'admin'];
+        && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role in ['owner','admin'];
+    }
+    function productData(d) {
+      return d.keys().hasAll(['name','description','category','price','image','active','stock'])
+        && d.keys().hasOnly(['name','description','category','price','image','active','stock','badge','featured','updatedAt'])
+        && d.name is string && d.name.size() >= 2 && d.name.size() <= 120
+        && d.description is string && d.description.size() <= 400
+        && d.category in ['Pasteles','Cupcakes','Postres','Panadería','Detalles']
+        && d.price is int && d.price >= 1 && d.price <= 100000
+        && d.image is string && d.image.matches('https://.*') && d.image.size() <= 2000
+        && d.active is bool
+        && (d.stock == null || (d.stock is int && d.stock >= 0 && d.stock <= 100000))
+        && d.get('badge','') is string && d.get('badge','').size() <= 30
+        && d.get('featured',false) is bool;
+    }
+    function promotionData(d) {
+      return d.keys().hasAll(['title','subtitle','eyebrow','image','ctaLabel','active'])
+        && d.keys().hasOnly(['title','subtitle','eyebrow','image','ctaLabel','active','updatedAt'])
+        && d.title is string && d.title.size() >= 3 && d.title.size() <= 100
+        && d.subtitle is string && d.subtitle.size() <= 240
+        && d.eyebrow is string && d.eyebrow.size() >= 2 && d.eyebrow.size() <= 40
+        && d.image is string && d.image.matches('https://.*') && d.image.size() <= 2000
+        && d.ctaLabel is string && d.ctaLabel.size() >= 2 && d.ctaLabel.size() <= 40
+        && d.active is bool;
     }
     match /products/{productId} {
-      allow read: if resource.data.active == true || staffMember();
-      // Product mutation goes through authenticated server APIs.
-      allow write: if false;
+      allow get, list: if staffMember() || resource.data.active == true;
+      allow create, update: if staffMember() && productData(request.resource.data);
+      allow delete: if false;
     }
-    match /promotions/{promotionId} { allow read: if resource.data.active == true || staffMember(); allow write: if false; }
+    match /promotions/{promotionId} {
+      allow get, list: if staffMember() || resource.data.active == true;
+      allow create, update: if staffMember() && promotionData(request.resource.data);
+      allow delete: if false;
+    }
     match /staff/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+    function validLine(line) {
+      let product = get(/databases/$(database)/documents/products/$(line.productId)).data;
+      return line is map
+        && line.keys().hasAll(['productId','name','price','quantity'])
+        && line.keys().hasOnly(['productId','name','price','quantity'])
+        && line.productId is string && line.productId.size() >= 2 && line.productId.size() <= 80
+        && line.name == product.name && line.price == product.price
+        && product.active == true
+        && line.quantity is int && line.quantity >= 1 && line.quantity <= 10
+        && (product.stock == null || product.stock >= line.quantity);
+    }
+    function lineAmount(line) { return line.price * line.quantity; }
+    function orderAmount(items) {
+      return lineAmount(items[0])
+        + (items.size() > 1 ? lineAmount(items[1]) : 0)
+        + (items.size() > 2 ? lineAmount(items[2]) : 0)
+        + (items.size() > 3 ? lineAmount(items[3]) : 0)
+        + (items.size() > 4 ? lineAmount(items[4]) : 0);
+    }
+    function allLines(items) {
+      return validLine(items[0])
+        && (items.size() < 2 || validLine(items[1]))
+        && (items.size() < 3 || validLine(items[2]))
+        && (items.size() < 4 || validLine(items[3]))
+        && (items.size() < 5 || validLine(items[4]));
+    }
+    function validCustomer(c) {
+      return c is map
+        && c.keys().hasAll(['name','phone','address','method','requestedDate'])
+        && c.keys().hasOnly(['name','phone','address','method','requestedDate'])
+        && c.name is string && c.name.size() >= 2 && c.name.size() <= 100
+        && c.phone is string && c.phone.matches('[+0-9()\\- ]{8,22}')
+        && c.address is string && c.address.size() <= 240
+        && c.method in ['Retiro','Entrega']
+        && (c.method != 'Entrega' || c.address.size() >= 8)
+        && c.requestedDate is string && c.requestedDate.size() <= 10;
+    }
+    function validNewOrder(d) {
+      return signedIn()
+        && d.keys().hasAll(['ownerUid','customer','items','subtotal','deliveryFee','total','notes','status','createdAt'])
+        && d.keys().hasOnly(['ownerUid','customer','items','subtotal','deliveryFee','total','notes','status','createdAt'])
+        && d.ownerUid == request.auth.uid
+        && validCustomer(d.customer)
+        && d.items is list && d.items.size() >= 1 && d.items.size() <= 5
+        && allLines(d.items)
+        && d.subtotal is int && d.subtotal == orderAmount(d.items)
+        && d.deliveryFee == 0 && d.total == d.subtotal && d.total <= 250000
+        && d.notes is string && d.notes.size() <= 500
+        && d.status == 'Nuevo'
+        && d.createdAt == request.time;
     }
     match /orders/{orderId} {
-      // Orders contain personal data and are server-only.
-      allow read, write: if false;
+      allow create: if validNewOrder(request.resource.data);
+      allow get: if staffMember() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow list: if staffMember();
+      allow update: if staffMember()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt'])
+        && request.resource.data.status in ['Nuevo','Confirmado','Preparando','Listo','Entregado','Cancelado']
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
     }
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    match /{document=**} { allow read, write: if false; }
   }
 }

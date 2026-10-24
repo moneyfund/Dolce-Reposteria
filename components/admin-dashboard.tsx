@@ -3,9 +3,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { ArrowDownLeft, ArrowLeft, ArrowRight, BarChart3, CalendarDays, Check, ChevronDown, ClipboardList, Eye, LayoutDashboard, LogOut, Menu, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Sparkles, TrendingUp, Users, Wallet, X } from "lucide-react";
 import { categories, currency, type Category, type Order, type OrderStatus, type Product, type Promotion } from "@/lib/types";
-import { demoMode, getDemoOrders, getDemoProducts, getDemoPromotions, saveDemoOrders, saveDemoProducts, saveDemoPromotions } from "@/lib/demo-storage";
+import { db, orderFromFirestore, readableError } from "@/lib/firestore-commerce";
+import { productSchema, promotionSchema } from "@/lib/validation";
 import { firebaseApp, firebaseAuth, hasFirebaseClient } from "@/lib/firebase-client";
-import { collection, getDocs, getFirestore, limit, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, getFirestore, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 type View = "resumen" | "pedidos" | "productos" | "promociones" | "clientes";
 const stateOptions: OrderStatus[] = ["Nuevo","Confirmado","Preparando","Listo","Entregado","Cancelado"];
@@ -25,8 +26,8 @@ export default function AdminDashboard() {
   const [orders,setOrders]=useState<Order[]>([]);
   const [products,setProducts]=useState<Product[]>([]);
   const [promotions,setPromotions]=useState<Promotion[]>([]);
-  const [authenticated,setAuthenticated]=useState(demoMode);
-  const [loading,setLoading]=useState(!demoMode);
+  const [authenticated,setAuthenticated]=useState(false);
+  const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState("");
   const [connection,setConnection]=useState<"idle"|"checking"|"connected"|"failed">("idle");
@@ -39,94 +40,104 @@ export default function AdminDashboard() {
   const [detail,setDetail]=useState<Order|null>(null);
   const [userName,setUserName]=useState("Equipo DOLCE");
   const refresh=useCallback(async()=>{
-    if(demoMode){setOrders(getDemoOrders());setProducts(getDemoProducts());setPromotions(getDemoPromotions());return;}
     const user=firebaseAuth().currentUser;
     if(!user){setAuthenticated(false);return;}
-    try {
-      const token=await user.getIdToken();
-      const opts={headers:{Authorization:"Bearer "+token},cache:"no-store" as RequestCache};
-      const [o,p,promo]=await Promise.all([fetch("/api/admin/orders",opts),fetch("/api/admin/products",opts),fetch("/api/admin/promotions",opts)]);
-      if(o.status===401||p.status===401||promo.status===401)throw new Error("Tu cuenta no tiene permisos administrativos. Solicita acceso al propietario.");
-      if(!o.ok||!p.ok||!promo.ok)throw new Error("No se pudieron cargar los datos.");
-      setOrders((await o.json()).orders);setProducts((await p.json()).products);setPromotions((await promo.json()).promotions);setAuthenticated(true);setError("");
-    }catch(e){setError(e instanceof Error?e.message:"Error de conexión");setAuthenticated(false);}
+    try{
+      const staff=await getDoc(doc(db(),"staff",user.uid));
+      if(!staff.exists() || !["owner","admin"].includes(staff.data().role)){
+        throw new Error("Tu cuenta no tiene permisos administrativos. En Firestore crea staff/"+user.uid+" con role: owner.");
+      }
+      const [o,p,promos]=await Promise.all([
+        getDocs(query(collection(db(),"orders"),orderBy("createdAt","desc"),limit(150))),
+        getDocs(query(collection(db(),"products"),limit(150))),
+        getDocs(query(collection(db(),"promotions"),limit(50))),
+      ]);
+      setOrders(o.docs.map(s=>orderFromFirestore(s.id,s.data())));
+      setProducts(p.docs.map(s=>({...s.data(),id:s.id} as Product)));
+      setPromotions(promos.docs.map(s=>({...s.data(),id:s.id} as Promotion)));
+      setAuthenticated(true);setError("");
+    }catch(e){setError(readableError(e));setAuthenticated(false);}
   },[]);
   useEffect(()=>{
-    if(demoMode){
-      const sync=()=>{setOrders(getDemoOrders());setProducts(getDemoProducts());setPromotions(getDemoPromotions());};
-      sync();window.addEventListener("dolce-demo-change",sync);
-      return()=>window.removeEventListener("dolce-demo-change",sync);
-    }
+    if(!hasFirebaseClient){setLoading(false);setError("Firebase todavía no está configurado.");return;}
     const unsub=onAuthStateChanged(firebaseAuth(),async user=>{
       setUserName(user?.displayName||"Equipo DOLCE");
-      if(user) await refresh();else setAuthenticated(false);
+      if(user)await refresh();
+      else setAuthenticated(false);
       setLoading(false);
     });
     return()=>unsub();
   },[refresh]);
+  // Live subscriptions, common source for the store and management console.
+  useEffect(()=>{
+    if(!authenticated)return;
+    const unsubOrders=onSnapshot(query(collection(db(),"orders"),orderBy("createdAt","desc"),limit(150)),
+      snap=>setOrders(snap.docs.map(s=>orderFromFirestore(s.id,s.data()))),
+      e=>setError(readableError(e)));
+    const unsubProducts=onSnapshot(query(collection(db(),"products"),limit(150)),
+      snap=>setProducts(snap.docs.map(s=>({...s.data(),id:s.id} as Product))),
+      e=>setError(readableError(e)));
+    const unsubPromos=onSnapshot(query(collection(db(),"promotions"),limit(50)),
+      snap=>setPromotions(snap.docs.map(s=>({...s.data(),id:s.id} as Promotion))),
+      e=>setError(readableError(e)));
+    return()=>{unsubOrders();unsubProducts();unsubPromos();};
+  },[authenticated]);
   async function testConnection(){
-    if(!hasFirebaseClient){setConnection("failed");return;}
     setConnection("checking");
-    try{
-      const db=getFirestore(firebaseApp());
-      await getDocs(query(collection(db,"products"),where("active","==",true),limit(1)));
-      setConnection("connected");
-    }catch{setConnection("failed");}
+    try{await getDocs(query(collection(db(),"products"),where("active","==",true),limit(1)));setConnection("connected");}
+    catch{setConnection("failed");}
   }
   async function login(){
     setLoading(true);setError("");
-    try {await signInWithPopup(firebaseAuth(),new GoogleAuthProvider());await refresh();}
-    catch(e){setError(e instanceof Error?e.message:"No fue posible iniciar sesión");}
+    try{await signInWithPopup(firebaseAuth(),new GoogleAuthProvider());await refresh();}
+    catch(e){setError(readableError(e));}
     finally{setLoading(false);}
   }
-  async function authFetch(path:string,method:string,data:unknown){
-    const token=await firebaseAuth().currentUser?.getIdToken();
-    const response=await fetch(path,{method,headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(data)});
-    const result=await response.json();
-    if(!response.ok)throw new Error(result.error||"Error al guardar");
-    return result;
-  }
   async function changeStatus(order:Order,status:OrderStatus){
-    setError("");setSaving(true);
-    try {
-      if(demoMode){saveDemoOrders(orders.map(o=>o.id===order.id?{...o,status}:o));}
-      else {await authFetch("/api/admin/orders/"+order.id,"PATCH",{status});await refresh();}
+    setSaving(true);setError("");
+    try{
+      await updateDoc(doc(db(),"orders",order.id),{status,updatedAt:serverTimestamp()});
       setDetail(current=>current?.id===order.id?{...current,status}:current);
-    }catch(e){setError(e instanceof Error?e.message:"No se pudo actualizar");}
+    }catch(e){setError(readableError(e));}
     finally{setSaving(false);}
   }
   async function saveProduct(event:React.FormEvent<HTMLFormElement>){
     event.preventDefault();if(!editing)return;
     setError("");setSaving(true);
-    const product={...editing,id:editing.id.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""),name:editing.name.trim(),image:editing.image.trim(),price:Number(editing.price),stock:editing.stock===null?null:Number(editing.stock)};
-    if(product.id.length<2||product.name.length<2||product.price<1||!product.image.startsWith("https://")){setError("Completa nombre, identificador, precio e imagen HTTPS.");setSaving(false);return;}
+    const candidate={...editing,id:editing.id.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""),
+      name:editing.name.trim(),image:editing.image.trim(),price:Number(editing.price),
+      stock:editing.stock===null?null:Number(editing.stock),featured:Boolean(editing.featured),badge:editing.badge||""};
+    const parsed=productSchema.safeParse(candidate);
+    if(!parsed.success){setError(parsed.error.issues[0]?.message||"Revisa los campos del producto.");setSaving(false);return;}
     try{
-      if(demoMode)saveDemoProducts([product,...products.filter(p=>p.id!==product.id)]);
-      else{await authFetch("/api/admin/products","POST",product);await refresh();}
+      const {id,...product}=parsed.data;
+      await setDoc(doc(db(),"products",id),{...product,updatedAt:serverTimestamp()},{merge:true});
       setEditing(null);setIsNew(false);
-    }catch(e){setError(e instanceof Error?e.message:"No se pudo guardar");}
+    }catch(e){setError(readableError(e));}
     finally{setSaving(false);}
   }
   async function toggleProduct(product:Product){
     setError("");
-    try{
-      if(demoMode)saveDemoProducts(products.map(p=>p.id===product.id?{...p,active:!p.active}:p));
-      else{await authFetch("/api/admin/products","POST",{...product,active:!product.active});await refresh();}
-    }catch(e){setError(e instanceof Error?e.message:"Error de actualización");}
+    try{await updateDoc(doc(db(),"products",product.id),{active:!product.active,updatedAt:serverTimestamp()});}
+    catch(e){setError(readableError(e));}
   }
-  async function savePromotion(event:React.FormEvent<HTMLFormElement>) {
+  async function savePromotion(event:React.FormEvent<HTMLFormElement>){
     event.preventDefault();if(!editingPromo)return;
     setSaving(true);setError("");
-    const promo={...editingPromo,id:editingPromo.id.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")};
-    if(promo.id.length<2||promo.title.length<3||!promo.image.startsWith("https://")){setError("Completa título, identificador e imagen HTTPS.");setSaving(false);return;}
-    try{if(demoMode)saveDemoPromotions([promo,...promotions.filter(p=>p.id!==promo.id)]);else{await authFetch("/api/admin/promotions","POST",promo);await refresh();}setEditingPromo(null);}
-    catch(e){setError(e instanceof Error?e.message:"No se pudo guardar la promoción");}
+    const candidate={...editingPromo,id:editingPromo.id.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")};
+    const parsed=promotionSchema.safeParse(candidate);
+    if(!parsed.success){setError(parsed.error.issues[0]?.message||"Revisa los campos de la promoción.");setSaving(false);return;}
+    try{
+      const {id,...promotion}=parsed.data;
+      await setDoc(doc(db(),"promotions",id),{...promotion,updatedAt:serverTimestamp()},{merge:true});
+      setEditingPromo(null);
+    }catch(e){setError(readableError(e));}
     finally{setSaving(false);}
   }
-  async function togglePromotion(promo:Promotion){
+  async function togglePromotion(promotion:Promotion){
     setError("");
-    try{if(demoMode)saveDemoPromotions(promotions.map(p=>p.id===promo.id?{...p,active:!p.active}:p));else{await authFetch("/api/admin/promotions","POST",{...promo,active:!promo.active});await refresh();}}
-    catch(e){setError(e instanceof Error?e.message:"No se pudo actualizar la promoción");}
+    try{await updateDoc(doc(db(),"promotions",promotion.id),{active:!promotion.active,updatedAt:serverTimestamp()});}
+    catch(e){setError(readableError(e));}
   }
   const validOrders=orders.filter(o=>o.status!=="Cancelado");
   const revenue=validOrders.filter(o=>o.status==="Entregado").reduce((sum,o)=>sum+o.total,0);
@@ -144,10 +155,9 @@ export default function AdminDashboard() {
   if(!authenticated)return <div className="login-page"><a href="/" className="login-back"><ArrowLeft size={17}/> Volver a la tienda</a><div className="login-card"><span className="login-symbol">✳</span><span className="eyebrow">DOLCE REPOSTERÍA</span><h1>Tu espacio de <em>creación.</em></h1><p>Gestiona pedidos, productos y todo lo que hace especial a DOLCE.</p>{error&&<div className="form-error">{error}</div>}<button className="button-dark wide" onClick={login}>Continuar con Google <ArrowRight size={18}/></button><small>Acceso exclusivo para personal autorizado.</small></div></div>;
   return <div className="admin-app">
     {sideOpen&&<button className="sidebar-overlay" aria-label="Cerrar menú" onClick={()=>setSideOpen(false)}/>}
-    <aside className={"admin-sidebar "+(sideOpen?"open":"")}><div className="admin-sidebar-top"><a href="/" className="admin-logo">dolce<span>.</span><small>MANAGER</small></a><span className="workspace-label">ESPACIO DE TRABAJO</span><nav className="admin-nav" aria-label="Administración">{tabs.map(item=>{const Icon=item.icon;return <button key={item.id} className={view===item.id?"active":""} onClick={()=>navigate(item.id)}><Icon size={19}/>{item.label}{item.id==="pedidos"&&newOrders>0&&<span className="nav-count">{newOrders}</span>}</button>;})}</nav></div><div className="admin-sidebar-bottom"><div className="sidebar-tip"><Sparkles size={19}/><strong>Tu negocio, más cerca.</strong><p>Todo lo que necesitas en un solo lugar.</p></div><a className="sidebar-store" href="/" target="_blank" rel="noreferrer"><ShoppingBag size={18}/> Ver tienda <ArrowRight size={16}/></a>{!demoMode&&<button className="sidebar-logout" onClick={()=>signOut(firebaseAuth())}><LogOut size={16}/> Cerrar sesión</button>}</div></aside>
-    <div className="admin-main"><header className="admin-topbar"><button className="admin-mobile-menu" aria-label="Menú" onClick={()=>setSideOpen(true)}><Menu size={23}/></button><div className="admin-breadcrumb">DOLCE <span>/</span> {tabs.find(t=>t.id===view)?.label}</div><div className="topbar-right">{demoMode&&<span className="demo-tag">Modo demostración</span>}<span className="online-dot"/> <span className="user-name">{userName}</span><span className="avatar">D</span></div></header>
+    <aside className={"admin-sidebar "+(sideOpen?"open":"")}><div className="admin-sidebar-top"><a href="/" className="admin-logo">dolce<span>.</span><small>MANAGER</small></a><span className="workspace-label">ESPACIO DE TRABAJO</span><nav className="admin-nav" aria-label="Administración">{tabs.map(item=>{const Icon=item.icon;return <button key={item.id} className={view===item.id?"active":""} onClick={()=>navigate(item.id)}><Icon size={19}/>{item.label}{item.id==="pedidos"&&newOrders>0&&<span className="nav-count">{newOrders}</span>}</button>;})}</nav></div><div className="admin-sidebar-bottom"><div className="sidebar-tip"><Sparkles size={19}/><strong>Tu negocio, más cerca.</strong><p>Todo lo que necesitas en un solo lugar.</p></div><a className="sidebar-store" href="/" target="_blank" rel="noreferrer"><ShoppingBag size={18}/> Ver tienda <ArrowRight size={16}/></a>{<button className="sidebar-logout" onClick={()=>signOut(firebaseAuth())}><LogOut size={16}/> Cerrar sesión</button>}</div></aside>
+    <div className="admin-main"><header className="admin-topbar"><button className="admin-mobile-menu" aria-label="Menú" onClick={()=>setSideOpen(true)}><Menu size={23}/></button><div className="admin-breadcrumb">DOLCE <span>/</span> {tabs.find(t=>t.id===view)?.label}</div><div className="topbar-right"><span className="online-dot"/> <span className="user-name">{userName}</span><span className="avatar">D</span></div></header>
       <div className="admin-content">
-      {demoMode&&<div className="firebase-check-strip"><span className="firebase-check-dot"/><span>{!hasFirebaseClient?"La aplicación aún no tiene configuración pública Firebase.":connection==="connected"?"Firestore responde correctamente a consultas públicas.":connection==="failed"?"No se pudo leer Firestore. Revisa la base de datos y sus reglas.":connection==="checking"?"Verificando conexión con Firestore...":"Firebase web configurado · Firestore todavía sin comprobar."}</span><button type="button" onClick={()=>void testConnection()} disabled={connection==="checking"||!hasFirebaseClient}>{connection==="checking"?"Comprobando...":"Probar conexión"} <ArrowRight size={14}/></button><a className="firebase-setup-link" href="/admin/acceso">Preparar acceso <ArrowRight size={14}/></a></div>}
       {error&&<div className="admin-error" role="alert">{error}<button onClick={()=>setError("")}><X size={17}/></button></div>}
       {view==="resumen"&&<><div className="admin-page-title"><div><span className="eyebrow">CENTRO DE CONTROL</span><h1>Un gran día comienza <em>aquí.</em></h1><p>Esto es lo que está pasando en tu negocio.</p></div><span className="today-tag"><CalendarDays size={16}/>{new Date().toLocaleDateString("es-NI",{day:"numeric",month:"long",year:"numeric"})}</span></div>
         <div className="kpi-grid"><div className="kpi-card"><span>Ventas completadas <Wallet size={20}/></span><strong>{currency(revenue)}</strong><small>Pedidos entregados registrados</small></div><div className="kpi-card"><span>Pedidos en proceso <ClipboardList size={20}/></span><strong>{pending}</strong><small>{newOrders} nuevos por confirmar</small></div><div className="kpi-card"><span>Clientes <Users size={20}/></span><strong>{customers.length}</strong><small>Con pedidos registrados</small></div><div className="kpi-card"><span>Productos activos <Package size={20}/></span><strong>{products.filter(p=>p.active).length}</strong><small>Disponibles en el catálogo</small></div></div>
