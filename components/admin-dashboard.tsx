@@ -6,8 +6,9 @@ import { categories, currency, type Category, type Order, type OrderStatus, type
 import { db, orderFromFirestore, readableError } from "@/lib/firestore-commerce";
 import { productSchema, promotionSchema } from "@/lib/validation";
 import { firebaseApp, firebaseAuth, hasFirebaseClient } from "@/lib/firebase-client";
-import { collection, doc, getDoc, getDocs, getFirestore, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { collection, doc, getDocs, getFirestore, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
+import { getIdTokenResult, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+const OWNER_EMAIL = "norvingarcia220@gmail.com";
 type View = "resumen" | "pedidos" | "productos" | "promociones" | "clientes";
 const stateOptions: OrderStatus[] = ["Nuevo","Confirmado","Preparando","Listo","Entregado","Cancelado"];
 const emptyPromo: Promotion = {id:"",title:"",subtitle:"",eyebrow:"EDICIÓN ESPECIAL",image:"",ctaLabel:"Ver delicias",active:true};
@@ -44,9 +45,11 @@ export default function AdminDashboard() {
     const user=firebaseAuth().currentUser;
     if(!user){setAuthenticated(false);return;}
     try{
-      const staff=await getDoc(doc(db(),"staff",user.uid));
-      if(!staff.exists() || !["owner","admin"].includes(staff.data().role)){
-        throw new Error("Google reconoció tu cuenta, pero no encontramos un permiso administrativo activo. Verifica en el proyecto dolce-reposteria el documento staff/"+user.uid+" y el campo role (texto): owner.");
+      // Firebase firma el ID token. El acceso se comprueba también en las reglas
+      // de Firestore y Storage; la interfaz nunca concede permisos por sí sola.
+      const token=await getIdTokenResult(user);
+      if(token.claims.email!==OWNER_EMAIL || token.claims.email_verified!==true || token.signInProvider!=="google.com"){
+        throw new Error("Esta cuenta de Google no está autorizada para administrar DOLCE. Inicia sesión con "+OWNER_EMAIL+".");
       }
       const [o,p,promos]=await Promise.all([
         getDocs(query(collection(db(),"orders"),orderBy("createdAt","desc"),limit(150))),
@@ -58,7 +61,15 @@ export default function AdminDashboard() {
       setProducts(p.docs.map(s=>({...s.data(),id:s.id} as Product)));
       setPromotions(promos.docs.map(s=>({...s.data(),id:s.id} as Promotion)));
       setAuthenticated(true);setError("");
-    }catch(e){if(firebaseAuth().currentUser?.uid!==user.uid)return;setError(readableError(e));setAuthenticated(false);}
+    }catch(e){
+      if(firebaseAuth().currentUser?.uid!==user.uid)return;
+      const reason=typeof e==="object"&&e!==null&&"code" in e?String(e.code):"";
+      const accessCorrect=user.email===OWNER_EMAIL;
+      setError(reason.includes("permission-denied")&&accessCorrect
+        ?"Tu cuenta de Google está autorizada, pero las reglas de acceso de Firebase todavía no están publicadas. Debes publicar las reglas actualizadas de firestore.rules para activar el panel."
+        :readableError(e));
+      setAuthenticated(false);
+    }
   },[]);
   useEffect(()=>{
     if(!hasFirebaseClient){setLoading(false);setError("Firebase todavía no está configurado.");return;}
@@ -92,7 +103,12 @@ export default function AdminDashboard() {
   }
   async function login(){
     setLoading(true);setError("");
-    try{await signInWithPopup(firebaseAuth(),new GoogleAuthProvider());await refresh();}
+    try{
+      const provider=new GoogleAuthProvider();
+      provider.setCustomParameters({prompt:"select_account"});
+      await signInWithPopup(firebaseAuth(),provider);
+      await refresh();
+    }
     catch(e){setError(readableError(e));}
     finally{setLoading(false);}
   }
@@ -157,7 +173,7 @@ export default function AdminDashboard() {
   const displayedProducts=products.filter(p=>(p.name+" "+p.category).toLowerCase().includes(search.toLowerCase()));
   function navigate(next:View){setView(next);setSearch("");setSideOpen(false);}
   if(loading)return <div className="admin-center"><div className="spinner"/>Cargando DOLCE Manager...</div>;
-  if(!authenticated)return <div className="login-page"><a href="/" className="login-back"><ArrowLeft size={17}/> Volver a la tienda</a><div className="login-card"><span className="login-symbol">✳</span><span className="eyebrow">DOLCE REPOSTERÍA</span><h1>Tu espacio de <em>creación.</em></h1><p>Gestiona pedidos, productos y todo lo que hace especial a DOLCE.</p>{error&&<div className="form-error" role="alert">{error}</div>}{account&&!account.isAnonymous&&<div className="login-recovery"><strong>Cuenta identificada</strong><span>{account.email||"Cuenta de Google"}</span><small>UID de Firebase</small><code>{account.uid}</code><a href="/admin/acceso">Ver los pasos para recuperar el acceso <ArrowRight size={15}/></a><button type="button" onClick={()=>void switchAccount()}>Usar otra cuenta de Google</button></div>}<button className="button-dark wide" onClick={()=>void (account&&!account.isAnonymous?recheckAccess():login())}>{account&&!account.isAnonymous?"Comprobar acceso de nuevo":"Continuar con Google"} <ArrowRight size={18}/></button><small>Acceso exclusivo para personal autorizado.</small></div></div>;
+  if(!authenticated)return <div className="login-page"><a href="/" className="login-back"><ArrowLeft size={17}/> Volver a la tienda</a><div className="login-card"><span className="login-symbol">✳</span><span className="eyebrow">DOLCE REPOSTERÍA</span><h1>Tu espacio de <em>creación.</em></h1><p>Gestiona pedidos, productos y todo lo que hace especial a DOLCE.</p>{error&&<div className="form-error" role="alert">{error}</div>}{account&&!account.isAnonymous&&<div className="login-recovery"><strong>Cuenta identificada</strong><span>{account.email||"Cuenta de Google"}</span><small>UID de Firebase</small><code>{account.uid}</code><p>Solo {OWNER_EMAIL} puede administrar DOLCE.</p><button type="button" onClick={()=>void switchAccount()}>Usar otra cuenta de Google</button></div>}<button className="button-dark wide" onClick={()=>void (account&&!account.isAnonymous?recheckAccess():login())}>{account&&!account.isAnonymous?"Comprobar acceso de nuevo":"Continuar con Google"} <ArrowRight size={18}/></button><small>Acceso exclusivo para personal autorizado.</small></div></div>;
   return <div className="admin-app">
     {sideOpen&&<button className="sidebar-overlay" aria-label="Cerrar menú" onClick={()=>setSideOpen(false)}/>}
     <aside className={"admin-sidebar "+(sideOpen?"open":"")}><div className="admin-sidebar-top"><a href="/" className="admin-logo">dolce<span>.</span><small>MANAGER</small></a><span className="workspace-label">ESPACIO DE TRABAJO</span><nav className="admin-nav" aria-label="Administración">{tabs.map(item=>{const Icon=item.icon;return <button key={item.id} className={view===item.id?"active":""} onClick={()=>navigate(item.id)}><Icon size={19}/>{item.label}{item.id==="pedidos"&&newOrders>0&&<span className="nav-count">{newOrders}</span>}</button>;})}</nav></div><div className="admin-sidebar-bottom"><div className="sidebar-tip"><Sparkles size={19}/><strong>Tu negocio, más cerca.</strong><p>Todo lo que necesitas en un solo lugar.</p></div><a className="sidebar-store" href="/" target="_blank" rel="noreferrer"><ShoppingBag size={18}/> Ver tienda <ArrowRight size={16}/></a>{<button className="sidebar-logout" onClick={()=>signOut(firebaseAuth())}><LogOut size={16}/> Cerrar sesión</button>}</div></aside>

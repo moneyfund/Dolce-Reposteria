@@ -2,10 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function staffMember() {
+    // Propietario único: identidad verificada por Firebase Authentication.
+    // El correo y el proveedor proceden del token firmado, no del navegador.
+    function isOwner() {
       return signedIn()
-        && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
-        && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role in ['owner','admin'];
+        && request.auth.token.email == 'norvingarcia220@gmail.com'
+        && request.auth.token.email_verified == true
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
     function productData(d) {
       return d.keys().hasAll(['name','description','category','price','image','active','stock'])
@@ -31,18 +34,18 @@ service cloud.firestore {
         && d.active is bool;
     }
     match /products/{productId} {
-      allow get, list: if staffMember() || resource.data.active == true;
-      allow create, update: if staffMember() && productData(request.resource.data);
+      allow get, list: if isOwner() || resource.data.active == true;
+      allow create, update: if isOwner() && productData(request.resource.data);
       allow delete: if false;
     }
     match /promotions/{promotionId} {
-      allow get, list: if staffMember() || resource.data.active == true;
-      allow create, update: if staffMember() && promotionData(request.resource.data);
+      allow get, list: if isOwner() || resource.data.active == true;
+      allow create, update: if isOwner() && promotionData(request.resource.data);
       allow delete: if false;
     }
+    // Colección obsoleta; los permisos ya no dependen de documentos staff.
     match /staff/{uid} {
-      allow get: if signedIn() && request.auth.uid == uid;
-      allow list, create, update, delete: if false;
+      allow read, write: if false;
     }
     // Compare each line with the actual catalog entry. No browser-supplied prices are trusted.
     function matchesPublishedProduct(line) {
@@ -124,9 +127,9 @@ service cloud.firestore {
     }
     match /orders/{orderId} {
       allow create: if validNewOrder(request.resource.data);
-      allow get: if staffMember() || (signedIn() && resource.data.ownerUid == request.auth.uid);
-      allow list: if staffMember();
-      allow update: if staffMember()
+      allow get: if isOwner() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow list: if isOwner();
+      allow update: if isOwner()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','updatedAt'])
         && request.resource.data.status in ['Nuevo','Confirmado','Preparando','Listo','Entregado','Cancelado']
         && request.resource.data.updatedAt == request.time;

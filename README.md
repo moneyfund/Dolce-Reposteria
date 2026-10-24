@@ -7,17 +7,17 @@ Plataforma de tienda pública y panel DOLCE Manager. Next.js, React, TypeScript,
 - **Tienda:** consulta en tiempo real los productos `active=true` y promociones públicas. El carrito se conserva en el navegador. El checkout valida nombres, precios y existencias desde Firestore antes de escribir la solicitud.
 - **Autenticación de clientes:** Firebase Authentication anónima permite comprar sin crear contraseña. Cada pedido se asocia al UID temporal del cliente. Hay que habilitar **Anonymous** en Firebase Console → Authentication → Sign-in method. Google debe permanecer habilitado para el personal de DOLCE.
 - **Pedidos reales:** `orders/{id}` recibe `ownerUid`, `customer`, `items`, `subtotal`, `deliveryFee`, `total`, `notes`, `status=Nuevo` y `createdAt=serverTimestamp()`. La regla valida los precios contra los documentos originales de `products`; **no confía en el subtotal del navegador**. Máximo 5 productos distintos por pedido y 10 unidades de cada uno.
-- **Manager:** login Google; autoriza solo si existe `staff/{uid}` con `role: "owner"` o `role: "admin"`. Escucha `orders`, `products` y `promotions` en tiempo real. El personal edita el catálogo, campañas y estados de pedidos.
+- **Manager:** inicio de sesión con Google, autorizado exclusivamente para `norvingarcia220@gmail.com` con correo verificado y proveedor Google. La aplicación y las reglas de Firestore/Storage comprueban esa identidad mediante el ID token firmado por Firebase; **no existe registro `staff` ni alta manual de UID**. Escucha `orders`, `products` y `promotions` en tiempo real.
 - **Inventario:** el checkout verifica las existencias pero **no reserva ni descuenta stock automáticamente**. El equipo debe confirmar disponibilidad y actualizar el inventario al gestionar pedidos; evitar prometer una reserva automática antes de implementar transacciones de inventario.
 - **Storage:** mantiene los permisos de `storage.rules` para fotos públicas de catálogo/promociones y adjuntos privados. La carga de fotos todavía usa URL HTTPS, no hay interfaz de subida directa.
 
 ## Configuración inicial
 
 1. En [Firebase Console](https://console.firebase.google.com/project/dolce-reposteria) habilita Firestore, Authentication **Google + Anonymous** y Storage.
-2. Publica manualmente el contenido de [`firestore.rules`](./firestore.rules) en **Firestore Database → Reglas**, sustituyendo las reglas anteriores. Las reglas deben estar publicadas antes de intentar pedidos, edición de productos o dashboard.
-3. Mantén sincronizadas las reglas [`storage.rules`](./storage.rules) en **Storage → Reglas**.
-4. Para registrar al propietario, entra en [`/admin/acceso`](https://dolce-reposteria.vercel.app/admin/acceso), inicia sesión con Google y copia tu UID. Crea el documento `staff/{uid}` desde Firebase Console con campo de texto `role` = `owner`. Los visitantes no pueden editar `staff`.
-5. En DOLCE Manager, inicia sesión con esa misma cuenta y crea al menos **un producto real, activo y con precio entero en C$**. No hay catálogo ficticio ni órdenes de prueba en producción.
+2. Publica [`firestore.rules`](./firestore.rules) en **Firestore Database → Reglas**; las nuevas reglas autorizan solo al propietario y conservan las validaciones de pedidos.
+3. Publica [`storage.rules`](./storage.rules) en **Storage → Reglas**. **Un despliegue de Vercel no actualiza las reglas de Firebase**; publicarlas es imprescindible para la nueva autorización.
+4. Abre [`/admin`](https://dolce-reposteria.vercel.app/admin) e inicia sesión con **`norvingarcia220@gmail.com`**. Accede directamente al panel, sin crear un documento `staff`. Cualquier otra cuenta es rechazada.
+5. Crea al menos **un producto real, activo y con precio entero en C$**. No hay catálogo ficticio ni órdenes de prueba en producción.
 6. Verifica un pedido real pequeño desde la web pública, comprueba que aparece en `orders` y en DOLCE Manager, y confirma el flujo antes de publicitar la tienda.
 
 ## Vercel

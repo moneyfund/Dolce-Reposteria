@@ -3,16 +3,13 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // La asignación de roles se administra en Firestore:
-    // staff/{uid} -> { role: "owner" | "admin" }
-    function isStaff() {
+    // Propietario único: correo verificado y sesión con Google.
+    // Firebase valida estas propiedades en el ID token firmado.
+    function isOwner() {
       return request.auth != null
-        && firestore.exists(
-          /databases/(default)/documents/staff/$(request.auth.uid)
-        )
-        && firestore.get(
-          /databases/(default)/documents/staff/$(request.auth.uid)
-        ).data.role in ['owner', 'admin'];
+        && request.auth.token.email == 'norvingarcia220@gmail.com'
+        && request.auth.token.email_verified == true
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
 
     // Solo fotografías optimizadas de hasta 8 MiB.
@@ -30,26 +27,26 @@ service firebase.storage {
     match /catalog/products/{productId}/{fileName} {
       allow get: if true;
       allow list: if false;
-      allow create, update: if isStaff() && validImage();
-      allow delete: if isStaff();
+      allow create, update: if isOwner() && validImage();
+      allow delete: if isOwner();
     }
 
     // Banners y fotografías de promociones públicas.
     match /catalog/promotions/{promotionId}/{fileName} {
       allow get: if true;
       allow list: if false;
-      allow create, update: if isStaff() && validImage();
-      allow delete: if isStaff();
+      allow create, update: if isOwner() && validImage();
+      allow delete: if isOwner();
     }
 
     // Referencias visuales para pedidos personalizados.
     // Por ahora: solo personal autorizado. No permitir que
     // visitantes anónimos carguen fotos sin protección antiabuso.
     match /order-references/{orderId}/{fileName} {
-      allow get: if isStaff();
+      allow get: if isOwner();
       allow list: if false;
-      allow create, update: if isStaff() && validImage();
-      allow delete: if isStaff();
+      allow create, update: if isOwner() && validImage();
+      allow delete: if isOwner();
     }
 
     // Todas las demás rutas permanecen cerradas.

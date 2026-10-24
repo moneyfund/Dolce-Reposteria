@@ -1,4 +1,6 @@
-import type { Metadata } from "next";
-import AccessSetup from "@/components/access-setup";
-export const metadata: Metadata = { title: "Preparar acceso del propietario" };
-export default function SetupPage(){ return <AccessSetup/>; }
+import { redirect } from "next/navigation";
+
+// El propietario accede directamente a /admin con Google.
+export default function LegacyAccessPage() {
+  redirect("/admin");
+}
