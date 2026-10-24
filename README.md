@@ -64,3 +64,13 @@ Subidas: JPEG, PNG o WebP de hasta 8 MiB. El panel de esta versión todavía uti
 Las reglas consultan roles desde Firestore; al publicarlas, la consola de Firebase puede solicitar autorizar la vinculación IAM entre Storage y Firestore. Verifica los permisos antes de hacer pruebas. Los enlaces de descarga públicos con token deben tratarse como compartibles aunque posteriormente se oculte un producto.
 
 Las imágenes privadas de pedidos no deben exponerse a través de enlaces de descarga permanentes sin un mecanismo de autorización adicional.
+
+## Pedidos reales: diagnóstico de conectividad (octubre 2026)
+
+El endpoint público `GET /api/orders` responde `{ "available": true }` solamente si Firebase Admin SDK tiene credenciales válidas, Firestore responde y existe al menos un producto con `active: true`. Un valor `false` deshabilita correctamente el envío de pedidos de clientes.
+
+Para habilitarlo, en **Vercel > Project Settings > Environment Variables** añade exclusivamente allí `FIREBASE_CLIENT_EMAIL` y `FIREBASE_PRIVATE_KEY`, extraídas de Firebase Console > Project settings > Service accounts > Generate new private key. Son valores secretos de servidor; no deben llevar el prefijo `NEXT_PUBLIC_`, enviarse por chat ni subirse al repositorio. La clave puede guardarse con saltos de línea reales o literales `\\n`; el backend admite ambos. En el mismo panel comprueba `FIREBASE_PROJECT_ID=dolce-reposteria`.
+
+Después, despliega nuevamente, registra productos reales activos desde el panel autorizado y verifica `/api/orders`. No cambies Firestore Security Rules para habilitar escrituras públicas: el servidor valida precios y existencias antes de registrar pedidos.
+
+El logo de la tienda se mantiene sin redibujar; la integración beige en el navbar utiliza `mix-blend-mode:multiply` para ocultar visualmente el rectángulo blanco de la imagen. Las imágenes destacadas cambian cada cuatro segundos.

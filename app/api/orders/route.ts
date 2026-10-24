@@ -4,7 +4,18 @@ import { orderSchema } from "@/lib/validation";
 import type { Product } from "@/lib/types";
 export const runtime = "nodejs";
 export async function GET() {
-  return NextResponse.json({ available: getBackend() !== null }, { headers: { "Cache-Control":"no-store" } });
+  const backend=getBackend();
+  if (!backend) {
+    return NextResponse.json({ available:false }, {headers:{"Cache-Control":"no-store"}});
+  }
+  try {
+    // Test actual Firestore access; merely having environment variables is not enough.
+    await backend.db.collection("products").limit(1).get();
+    const available=(await backend.db.collection("products").where("active","==",true).limit(1).get()).size>0;
+    return NextResponse.json({available},{headers:{"Cache-Control":"no-store"}});
+  } catch {
+    return NextResponse.json({available:false},{headers:{"Cache-Control":"no-store"}});
+  }
 }
 export async function POST(request: Request) {
   const backend = getBackend();

@@ -38,6 +38,7 @@ export default function Storefront() {
   const [heroIndex,setHeroIndex] = useState(0);
   const [reduceMotion,setReduceMotion] = useState(false);
   const [orderServiceReady,setOrderServiceReady] = useState<boolean|null>(null);
+  const [serviceNotice,setServiceNotice] = useState("");
   const [checkout,setCheckout] = useState(false);
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState("");
@@ -59,8 +60,13 @@ export default function Storefront() {
     let mounted=true;
     fetch("/api/orders",{cache:"no-store"})
       .then(r=>r.ok?r.json():{available:false})
-      .then(d=>{if(mounted)setOrderServiceReady(d.available===true);})
-      .catch(()=>{if(mounted)setOrderServiceReady(false);});
+      .then(d=>{
+        if(mounted){
+          setOrderServiceReady(d.available===true);
+          setServiceNotice(d.available===true?"":"El servicio de pedidos está en configuración. Tu carrito permanece guardado.");
+        }
+      })
+      .catch(()=>{if(mounted){setOrderServiceReady(false);setServiceNotice("No se pudo verificar el servicio de pedidos.");}});
     return()=>{mounted=false;};
   },[]);
   useEffect(() => {
@@ -100,7 +106,7 @@ export default function Storefront() {
     if(featuredProducts.length<2||reduceMotion)return;
     const timer=window.setInterval(()=>{
       if(document.visibilityState==="visible")setHeroIndex(previous=>(previous+1)%featuredProducts.length);
-    },2000);
+    },4000);
     return()=>window.clearInterval(timer);
   },[featuredProducts.length,reduceMotion]);
   const count=cart.reduce((sum,item)=>sum+item.quantity,0);
@@ -124,7 +130,7 @@ export default function Storefront() {
       const result=await response.json();
       if(!response.ok)throw new Error(result.error||"No se pudo registrar el pedido");
       const receipt:{id:string,total:number}=result.order;
-            setSuccess(receipt);setCart([]);setCheckout(false);
+      setSuccess(receipt);setCart([]);setCheckout(false);
     } catch(e) {setError(e instanceof Error?e.message:"Ocurrió un error");}
     finally {setBusy(false);}
   }
@@ -200,7 +206,7 @@ export default function Storefront() {
     <footer className="footer"><div className="footer-top"><a href="#inicio" className="footer-brand">dolce<span>.</span></a><span>Repostería hecha con amor, en Matagalpa.</span><a href="/admin" className="footer-admin">Acceso al equipo <ArrowRight size={14}/></a></div><div className="footer-bottom"><span>© {new Date().getFullYear()} DOLCE Repostería</span><span>El ingrediente secreto siempre es el cariño ♥</span></div></footer>
     <AnimatePresence>{cartOpen&&<><motion.div className="drawer-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>{setCartOpen(false);setCheckout(false);setError("");}}/><motion.aside className="cart-drawer" initial={{x:"100%"}} animate={{x:0}} exit={{x:"100%"}} transition={{type:"spring",damping:28,stiffness:260}} aria-label="Tu pedido"><div className="drawer-header"><div><span className="eyebrow">ALGO DULCE ESTÁ EN CAMINO</span><h2>{success?"¡Listo!":checkout?"Finaliza tu pedido":"Tu cajita dulce"} <span>♥</span></h2></div><button type="button" aria-label="Cerrar" onClick={()=>{setCartOpen(false);setCheckout(false);setSuccess(null);setError("");}}><X size={23}/></button></div>
       {success ? <div className="order-success"><span className="success-icon"><Check size={32}/></span><h3>¡Recibimos tu pedido!</h3><p>Tu solicitud quedó registrada. El equipo de DOLCE confirmará los detalles y la entrega.</p><strong>#{success.id}</strong><p>Total de productos: {currency(success.total)}. El envío, si corresponde, se cotiza por separado.</p><button className="button-dark wide" onClick={()=>{setCartOpen(false);setSuccess(null);}}>Seguir explorando</button></div> :
-      checkout ? <form className="checkout-form" onSubmit={submitOrder}><button type="button" className="back-link" onClick={()=>setCheckout(false)}><ArrowLeft size={16}/> Volver a mi carrito</button><div className="field-row"><label>Nombre completo<input required minLength={2} maxLength={100} value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})} placeholder="¿A nombre de quién?"/></label><label>Teléfono / WhatsApp<input required minLength={8} maxLength={22} value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})} placeholder="8888 8888" type="tel"/></label></div><span className="form-label">¿Cómo lo recibirás?</span><div className="delivery-toggle"><button type="button" className={delivery==="Retiro"?"active":""} onClick={()=>setDelivery("Retiro")}>Retirar en tienda</button><button type="button" className={delivery==="Entrega"?"active":""} onClick={()=>setDelivery("Entrega")}>Entrega a domicilio</button></div>{delivery==="Entrega"&&<label>Dirección de entrega<input required minLength={8} maxLength={240} value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})} placeholder="Barrio, dirección y referencia"/></label>}<label>Fecha deseada <span>(opcional)</span><input type="date" min={new Date().toISOString().slice(0,10)} value={customer.requestedDate} onChange={e=>setCustomer({...customer,requestedDate:e.target.value})}/></label><label>Dedicatoria o indicaciones <span>(opcional)</span><textarea rows={3} maxLength={500} value={customer.notes} onChange={e=>setCustomer({...customer,notes:e.target.value})} placeholder="¿Algún detalle especial?"/></label><p className="form-note">{orderServiceReady===false?"Los pedidos en línea aún no están disponibles. Puedes conservar los productos en tu carrito.":"DOLCE confirmará disponibilidad, fecha y, si aplica, el costo de entrega. No se cobra en línea."}</p>{error&&<div className="form-error" role="alert">{error}</div>}<div className="checkout-bottom"><div className="cart-total"><span>Total de productos</span><strong>{currency(subtotal)}</strong></div><button type="submit" className="button-dark wide" disabled={busy||orderServiceReady!==true}>{busy?"Registrando...":orderServiceReady===null?"Verificando pedidos...":orderServiceReady?"Enviar mi pedido":"Pedidos en línea no disponibles"} <ArrowRight size={18}/></button></div></form> :
+      checkout ? <form className="checkout-form" onSubmit={submitOrder}><button type="button" className="back-link" onClick={()=>setCheckout(false)}><ArrowLeft size={16}/> Volver a mi carrito</button><div className="field-row"><label>Nombre completo<input required minLength={2} maxLength={100} value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})} placeholder="¿A nombre de quién?"/></label><label>Teléfono / WhatsApp<input required minLength={8} maxLength={22} value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})} placeholder="8888 8888" type="tel"/></label></div><span className="form-label">¿Cómo lo recibirás?</span><div className="delivery-toggle"><button type="button" className={delivery==="Retiro"?"active":""} onClick={()=>setDelivery("Retiro")}>Retirar en tienda</button><button type="button" className={delivery==="Entrega"?"active":""} onClick={()=>setDelivery("Entrega")}>Entrega a domicilio</button></div>{delivery==="Entrega"&&<label>Dirección de entrega<input required minLength={8} maxLength={240} value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})} placeholder="Barrio, dirección y referencia"/></label>}<label>Fecha deseada <span>(opcional)</span><input type="date" min={new Date().toISOString().slice(0,10)} value={customer.requestedDate} onChange={e=>setCustomer({...customer,requestedDate:e.target.value})}/></label><label>Dedicatoria o indicaciones <span>(opcional)</span><textarea rows={3} maxLength={500} value={customer.notes} onChange={e=>setCustomer({...customer,notes:e.target.value})} placeholder="¿Algún detalle especial?"/></label><p className="form-note">{orderServiceReady===false?serviceNotice:"DOLCE confirmará disponibilidad, fecha y, si aplica, el costo de entrega. No se cobra en línea."}</p>{error&&<div className="form-error" role="alert">{error}</div>}<div className="checkout-bottom"><div className="cart-total"><span>Total de productos</span><strong>{currency(subtotal)}</strong></div><button type="submit" className="button-dark wide" disabled={busy||orderServiceReady!==true}>{busy?"Registrando...":orderServiceReady===null?"Verificando pedidos...":orderServiceReady?"Enviar mi pedido":"Pedidos en línea no disponibles"} <ArrowRight size={18}/></button></div></form> :
       <><div className="cart-items">{cart.length?cart.map(item=><div className="cart-item" key={item.productId}><img src={item.image} alt=""/><div className="cart-item-details"><h3>{item.name}</h3><span>{currency(item.price)}</span><div className="qty-controls"><button aria-label="Restar" onClick={()=>quantity(item.productId,-1)}><Minus size={13}/></button><span>{item.quantity}</span><button aria-label="Sumar" onClick={()=>quantity(item.productId,1)}><Plus size={13}/></button></div></div><button className="remove-item" aria-label="Eliminar producto" onClick={()=>setCart(old=>old.filter(i=>i.productId!==item.productId))}><Trash2 size={17}/></button></div>):<div className="cart-empty"><ShoppingBag size={42}/><h3>Tu carrito espera algo delicioso</h3><p>Elige tus favoritos y comienza tu pedido.</p><button className="button-dark" onClick={()=>setCartOpen(false)}>Explorar delicias <ArrowRight size={17}/></button></div>}</div>{cart.length>0&&<div className="cart-footer"><div className="cart-total"><span>Subtotal</span><strong>{currency(subtotal)}</strong></div><p>Entrega sujeta a confirmación. No incluye envío.</p><button className="button-dark wide" onClick={()=>{setCheckout(true);setError("");}}>Continuar pedido <ArrowRight size={18}/></button></div>}</>}
     </motion.aside></>}</AnimatePresence>
   </main>;

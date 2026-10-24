@@ -18,6 +18,10 @@ html{scroll-padding-top:125px}
 .shop-page .site-header.is-scrolled .header-order{background:rgba(84,40,57,.9)}
 .shop-page .site-header .nav-links a{color:#372b2c}
 .shop-page .site-header .brand-original,.shop-page .site-header .brand-viewport{height:79px}
+/* The supplied logo image is retained unaltered. Multiply removes the visible
+   white rectangle against the beige navbar without changing brand artwork. */
+.shop-page .brand-viewport{background:transparent}
+.shop-page .brand-viewport img{mix-blend-mode:multiply;background:transparent!important}
 .shop-page .hero.dolce-hero{padding-top:145px!important;padding-bottom:81px!important}
 .shop-page .hero-visual{isolation:isolate}
 .shop-page .hero-photo-frame{position:relative;isolation:isolate}
