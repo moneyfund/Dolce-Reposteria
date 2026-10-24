@@ -40,6 +40,29 @@ const SOCIAL_ITEMS:{id:keyof SocialLinks;label:string;icon:typeof Instagram}[]=[
   {id:"tiktok",label:"TikTok",icon:Music2},
   {id:"whatsapp",label:"WhatsApp",icon:MessageCircle},
 ];
+
+// WhatsApp para solicitudes personalizadas, usando el contacto editable desde Admin → Redes.
+const SPECIAL_ORDER_MESSAGE="¡Hola, DOLCE! Me gustaría solicitar un pedido especial o personalizado. ¿Podrían ayudarme con los detalles y una cotización?";
+function specialOrderWhatsAppUrl(configuredLink:string):string|null {
+  if(!configuredLink)return null;
+  try{
+    const url=new URL(configuredLink);
+    const host=url.hostname.toLowerCase().replace(/^www\./,"");
+    if(url.protocol!=="https:" || !["wa.me","whatsapp.com","api.whatsapp.com","web.whatsapp.com"].includes(host))return null;
+    // wa.me/<numero> y whatsapp.com/send?phone=<numero> abren directamente el chat.
+    // Otros tipos de enlaces (invitaciones o canales) no se usan para pedidos.
+    if(host==="wa.me"){
+      const phone=url.pathname.replace(/^\/+|\/+$/g,"");
+      if(!/^\d{8,15}$/.test(phone))return null;
+    }else{
+      if(!/^\/send\/?$/.test(url.pathname))return null;
+      const phone=url.searchParams.get("phone")||"";
+      if(!/^\d{8,15}$/.test(phone))return null;
+    }
+    url.searchParams.set("text",SPECIAL_ORDER_MESSAGE);
+    return url.toString();
+  }catch{return null;}
+}
 export default function Storefront() {
   const [products,setProducts] = useState<Product[]>([]);
   const [promotions,setPromotions] = useState<Promotion[]>([]);
@@ -150,6 +173,7 @@ export default function Storefront() {
     finally{setBusy(false);}
   }
   const navigate=()=>setMobileOpen(false);
+  const specialOrderLink=specialOrderWhatsAppUrl(socialLinks.whatsapp);
   return <main className="shop-page">
     <header className={"site-header"+(navScrolled?" is-scrolled":"")}>
       <a className="brand brand-original" href="#inicio" onClick={navigate} aria-label="Dolce Pastelería, inicio">
@@ -158,7 +182,7 @@ export default function Storefront() {
       <nav className={mobileOpen?"nav-links open":"nav-links"} aria-label="Navegación principal">
         <a href="#inicio" onClick={navigate}>Inicio</a>
         <a href="#catalogo" onClick={navigate}>Productos</a>
-        <a href="#especial" onClick={navigate}>Pedidos especiales</a>
+        <a href={specialOrderLink||"#especial"} onClick={navigate} target={specialOrderLink?"_blank":undefined} rel={specialOrderLink?"noopener noreferrer":undefined}>Pedidos especiales</a>
         <a href="#promociones" onClick={navigate}>Promociones</a>
         <a href="#redes" onClick={navigate}>Redes</a>
       </nav>
@@ -176,7 +200,7 @@ export default function Storefront() {
         <motion.p initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} transition={{duration:.62,delay:.25}} className="hero-sub">Repostería artesanal de Matagalpa. Pasteles, postres y detalles para tus celebraciones y antojos.</motion.p>
         <motion.div initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} transition={{duration:.62,delay:.34}} className="hero-buttons">
           <a className="button-primary" href="#catalogo">Explorar sabores <ArrowRight size={17}/></a>
-          <a href="#especial" className="button-text">Pedidos especiales <ArrowRight size={17}/></a>
+          <a href={specialOrderLink||"#especial"} target={specialOrderLink?"_blank":undefined} rel={specialOrderLink?"noopener noreferrer":undefined} className="button-text" aria-label={specialOrderLink?"Solicitar un pedido personalizado por WhatsApp":"Ver pedidos especiales"}>Pedidos especiales <ArrowRight size={17}/></a>
         </motion.div>
       </div>
       <div className="hero-visual">
@@ -217,7 +241,7 @@ export default function Storefront() {
       <div className="catalog-end"><span>Hechos para compartir, creados para recordar.</span><span>♥</span></div>
     </section>
     <section id="promociones" className="promo-section section-shell">{promotions.length>0&&<><div className="promo-header"><span className="eyebrow"><span className="eyebrow-line"/> ALGO ESPECIAL PARA TI</span><span>Selecciones de temporada ✳</span></div><div className="promo-grid">{promotions.map(promo=><motion.article {...reveal} className="promo-tile" key={promo.id}><img src={promo.image} alt={promo.title} loading="lazy"/><div className="promo-shade"/><div className="promo-tile-copy"><span>{promo.eyebrow}</span><h2>{promo.title}</h2><p>{promo.subtitle}</p><a href="#catalogo">{promo.ctaLabel} <ArrowRight size={17}/></a></div></motion.article>)}</div></>}</section>
-    <section id="especial" className="special"><motion.div {...reveal} className="special-image"><img src={detailImage} alt="Selección de postres artesanales" loading="lazy"/><div className="special-seal">DOLCE<br/>♥<br/>MOMENTS</div></motion.div><motion.div {...reveal} className="special-copy"><span className="eyebrow"><span className="eyebrow-line"/> PARA TUS MOMENTOS</span><h2>Hay momentos que merecen <em>algo único.</em></h2><p>Cumpleaños, celebraciones o un simple «porque sí». Cuéntanos tu idea y hagamos que suceda.</p><a href="#catalogo" className="button-dark">Encontrar mi dulce <ArrowRight size={18}/></a><span className="special-decoration">✳</span></motion.div></section>
+    <section id="especial" className="special"><motion.div {...reveal} className="special-image"><img src={detailImage} alt="Selección de postres artesanales" loading="lazy"/><div className="special-seal">DOLCE<br/>♥<br/>MOMENTS</div></motion.div><motion.div {...reveal} className="special-copy"><span className="eyebrow"><span className="eyebrow-line"/> PARA TUS MOMENTOS</span><h2>Hay momentos que merecen <em>algo único.</em></h2><p>Cumpleaños, celebraciones o un simple «porque sí». Cuéntanos tu idea y hagamos que suceda.</p><a href={specialOrderLink||"#catalogo"} target={specialOrderLink?"_blank":undefined} rel={specialOrderLink?"noopener noreferrer":undefined} className="button-dark">{specialOrderLink?"Cotizar por WhatsApp":"Encontrar mi dulce"} <ArrowRight size={18}/></a><span className="special-decoration">✳</span></motion.div></section>
     <section id="redes" className="social-follow section-shell" aria-labelledby="social-follow-title">
       <div><span className="eyebrow"><span className="eyebrow-line"/> CONECTEMOS</span><h2 id="social-follow-title">Un poquito más de <em>DOLCE.</em></h2><p>Novedades, creaciones y momentos dulces, también en nuestras redes.</p></div>
       <div className="social-public-links">
