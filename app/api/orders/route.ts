@@ -4,22 +4,29 @@ import { orderSchema } from "@/lib/validation";
 import type { Product } from "@/lib/types";
 export const runtime = "nodejs";
 export async function GET() {
-  const backend=getBackend();
-  if (!backend) {
-    return NextResponse.json({ available:false }, {headers:{"Cache-Control":"no-store"}});
+  const headers={"Cache-Control":"no-store"};
+  // The public checkout must never accept live orders while Manager still uses demo data.
+  if (process.env.NEXT_PUBLIC_DOLCE_LIVE_MODE !== "true") {
+    return NextResponse.json({available:false},{headers});
   }
   try {
-    // Test actual Firestore access; merely having environment variables is not enough.
-    await backend.db.collection("products").limit(1).get();
-    const available=(await backend.db.collection("products").where("active","==",true).limit(1).get()).size>0;
-    return NextResponse.json({available},{headers:{"Cache-Control":"no-store"}});
+    const backend=getBackend();
+    if (!backend) return NextResponse.json({available:false},{headers});
+    // Health-check actual DB connectivity and a published, active product.
+    const products=await backend.db.collection("products").where("active","==",true).limit(1).get();
+    return NextResponse.json({available:products.size>0},{headers});
   } catch {
-    return NextResponse.json({available:false},{headers:{"Cache-Control":"no-store"}});
+    return NextResponse.json({available:false},{headers});
   }
 }
 export async function POST(request: Request) {
-  const backend = getBackend();
-  if (!backend) return NextResponse.json({ error: "Los pedidos en línea aún no están disponibles. Inténtalo más adelante." }, { status: 503 });
+  if (process.env.NEXT_PUBLIC_DOLCE_LIVE_MODE !== "true") {
+    return NextResponse.json({error:"El sistema de pedidos todavía se está configurando."},{status:503});
+  }
+  let backend: ReturnType<typeof getBackend>;
+  try { backend=getBackend(); }
+  catch { return NextResponse.json({error:"Servicio temporalmente no disponible."},{status:503}); }
+  if (!backend) return NextResponse.json({ error:"Los pedidos en línea aún no están disponibles." }, {status:503});
   let payload: unknown;
   try { payload = await request.json(); } catch { return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 }); }
   const result = orderSchema.safeParse(payload);

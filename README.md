@@ -67,10 +67,13 @@ Las imágenes privadas de pedidos no deben exponerse a través de enlaces de des
 
 ## Pedidos reales: diagnóstico de conectividad (octubre 2026)
 
-El endpoint público `GET /api/orders` responde `{ "available": true }` solamente si Firebase Admin SDK tiene credenciales válidas, Firestore responde y existe al menos un producto con `active: true`. Un valor `false` deshabilita correctamente el envío de pedidos de clientes.
+El endpoint público `GET /api/orders` responde `{ "available": true }` solamente si `NEXT_PUBLIC_DOLCE_LIVE_MODE=true`, Firebase Admin SDK tiene credenciales válidas, Firestore responde y existe al menos un producto con `active: true`. Un valor `false` deshabilita correctamente el envío de pedidos de clientes.
 
 Para habilitarlo, en **Vercel > Project Settings > Environment Variables** añade exclusivamente allí `FIREBASE_CLIENT_EMAIL` y `FIREBASE_PRIVATE_KEY`, extraídas de Firebase Console > Project settings > Service accounts > Generate new private key. Son valores secretos de servidor; no deben llevar el prefijo `NEXT_PUBLIC_`, enviarse por chat ni subirse al repositorio. La clave puede guardarse con saltos de línea reales o literales `\\n`; el backend admite ambos. En el mismo panel comprueba `FIREBASE_PROJECT_ID=dolce-reposteria`.
 
 Después, despliega nuevamente, registra productos reales activos desde el panel autorizado y verifica `/api/orders`. No cambies Firestore Security Rules para habilitar escrituras públicas: el servidor valida precios y existencias antes de registrar pedidos.
 
 El logo de la tienda se mantiene sin redibujar; la integración beige en el navbar utiliza `mix-blend-mode:multiply` para ocultar visualmente el rectángulo blanco de la imagen. Las imágenes destacadas cambian cada cuatro segundos.
+
+### Activación final sin simulaciones
+En este despliegue, `NEXT_PUBLIC_DOLCE_LIVE_MODE` está en `false`. Una vez que Vercel tenga las credenciales secretas, que el rol `staff/{uid}` esté creado y que el catálogo real esté registrado, cambiar la variable a `true` en las variables del proyecto y efectuar un nuevo despliegue. **La API rechaza pedidos mientras el panel esté en demostración**, para que pedidos reales nunca queden fuera del Manager. El panel público bloquea el envío hasta comprobar esta condición.

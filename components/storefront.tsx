@@ -95,6 +95,12 @@ export default function Storefront() {
     return()=>{alive=false;if(demoMode)window.removeEventListener("dolce-demo-change",sync);stopProducts?.();stopPromos?.();};
   },[]);
   useEffect(()=>{ if(ready) localStorage.setItem(CART_KEY,JSON.stringify(cart)); },[cart,ready]);
+  useEffect(()=>{
+    if(!cartOpen)return;
+    const previous=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    return()=>{document.body.style.overflow=previous;};
+  },[cartOpen]);
   const visible = useMemo(()=> products.filter(p => (category==="Todos" || p.category===category) && (p.name+" "+p.description).toLocaleLowerCase("es").includes(search.toLocaleLowerCase("es"))),[products,category,search]);
   const featuredProducts=useMemo(()=>{
     const active=products.filter(p=>p.active&&p.stock!==0);
