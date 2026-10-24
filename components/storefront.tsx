@@ -9,8 +9,8 @@ import { firebaseApp, hasFirebaseClient } from "@/lib/firebase-client";
 import { collection, getFirestore, limit, onSnapshot, query, where } from "firebase/firestore";
 const CART_KEY = "dolce-cart-v1";
 const heroImage = "https://images.unsplash.com/photo-1464305795204-6f5bbfc7fb81?w=1400&auto=format&fit=crop&q=88";
-// Archivo exacto proporcionado por DOLCE. No se redibuja ni se edita el logotipo.
-const logoImage = "https://d2ol7oe51mr4n9.cloudfront.net/user_3KniZP3dkw5KyzASdx6oDnrJPeH/c19a365e-17e7-4ab2-b9f2-c22070406fc3.png";
+// Logotipo original DOLCE con fondo transparente, servido como recurso local.
+const logoImage = "/dolce-logo-transparent.png";
 const detailImage = "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=1200&auto=format&fit=crop&q=85";
 const reveal = { initial: { opacity: 0, y: 24 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: "-70px" }, transition: { duration: .55 } };
 function ProductCard({ product, onAdd, index }: { product: Product; onAdd: (p: Product) => void; index: number }) {
@@ -134,7 +134,7 @@ export default function Storefront() {
   return <main className="shop-page">
     <header className={"site-header"+(navScrolled?" is-scrolled":"")}>
       <a className="brand brand-original" href="#inicio" onClick={navigate} aria-label="Dolce Pastelería, inicio">
-        <span className="brand-viewport"><img src={logoImage} alt="Dolce Pastelería, logotipo original" width={752} height={428} /></span>
+        <span className="brand-viewport"><img src={logoImage} alt="Dolce Pastelería, logotipo original" width={270} height={132} /></span>
       </a>
       <nav className={mobileOpen?"nav-links open":"nav-links"} aria-label="Navegación principal">
         <a href="#inicio" onClick={navigate}>Inicio</a>

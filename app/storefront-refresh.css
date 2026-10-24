@@ -4,7 +4,7 @@
 .shop-page .site-header{position:relative;top:auto;left:auto;min-height:94px;padding:5px 5.5%;background:#fff;color:#2c2527;box-shadow:0 1px 0 #e8e0d3;gap:25px}
 .shop-page .brand-original{width:180px;height:87px;display:block;flex:none;overflow:hidden;position:relative;line-height:1}
 .shop-page .brand-viewport{width:100%;height:100%;display:block;position:relative;overflow:hidden}
-.shop-page .brand-viewport img{position:absolute;display:block;max-width:none;width:248px;height:auto;left:-39px;top:-14px;pointer-events:none}
+.shop-page .brand-viewport img{position:static;display:block;max-width:100%;width:auto;height:100%;object-fit:contain;pointer-events:none}
 .shop-page .nav-links{gap:clamp(14px,2.6vw,38px);margin-left:0}
 .shop-page .nav-links a{color:#51484b;font-size:12px;position:relative;padding:10px 0}
 .shop-page .nav-links a::after{content:"";position:absolute;width:0;height:2px;background:var(--gold);bottom:3px;left:0;transition:width .3s}
@@ -104,7 +104,7 @@
 }
 @media(max-width:800px){
 .shop-page .site-header{height:89px;min-height:89px;padding:5px 5%}
-.shop-page .brand-original{width:156px;height:75px}.shop-page .brand-viewport img{width:215px;left:-34px;top:-12px}
+.shop-page .brand-original{width:156px;height:75px}.shop-page .brand-viewport img{width:auto;height:100%;left:auto;top:auto}
 .shop-page .nav-links{top:83px;left:4%;right:4%;background:#fffaf2;border:1px solid #efe3d4;border-radius:13px;padding:14px}
 .shop-page .nav-links a{font-size:13px;color:#4d3840;padding:14px}
 .shop-page .hero.dolce-hero{grid-template-columns:1fr 1fr;min-height:570px;padding:45px 5% 58px}
@@ -118,7 +118,7 @@
 }
 @media(max-width:600px){
 .shop-page .site-header{height:79px;min-height:79px;padding:5px 5%;gap:8px}
-.shop-page .brand-original{width:135px;height:65px}.shop-page .brand-viewport img{width:186px;left:-29px;top:-10px}
+.shop-page .brand-original{width:135px;height:65px}.shop-page .brand-viewport img{width:auto;height:100%;left:auto;top:auto}
 .shop-page .header-actions{gap:8px}.shop-page .header-order{width:43px;height:43px;min-height:43px;padding:0;font-size:0;display:grid;place-items:center}.shop-page .header-order svg{width:19px;height:19px}
 .shop-page .cart-trigger{width:41px;height:41px}.shop-page .nav-links{top:75px}
 .shop-page .hero.dolce-hero{display:flex;flex-direction:column;align-items:stretch;min-height:auto;padding:45px 7% 55px;gap:0}
