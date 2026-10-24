@@ -308,3 +308,56 @@ img{display:block;max-width:100%}
 .login-recovery a{font-size:11px;font-weight:800;color:#82445b;display:inline-flex;align-items:center;gap:7px;margin-top:4px}
 .login-recovery a:hover{text-decoration:underline}
 .login-recovery button{border:0;background:transparent;padding:4px 0;color:#835165;text-decoration:underline;font-size:11px;font-weight:700}
+
+/* DOLCE product photo gallery / social channels · October 2026 */
+.product-image-wrap{isolation:isolate}
+.shop-page .product-gallery-control{position:absolute;z-index:4;bottom:12px;left:12px;display:flex;align-items:center;gap:10px;padding:5px;border:1px solid #ffffff77;border-radius:100px;background:#fff9f0eb;box-shadow:0 6px 22px #39211e20;backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px)}
+.shop-page .product-gallery-control button{width:30px;height:30px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:#593546;cursor:pointer;transition:background .2s}
+.shop-page .product-gallery-control button:hover{background:#e9d4d0}
+.shop-page .product-gallery-control span{font-size:11px;font-weight:700;color:#593546;min-width:35px;text-align:center;font-variant-numeric:tabular-nums}
+.product-media-editor{display:flex;flex-direction:column;gap:12px;min-width:0}
+.photo-section-heading{display:flex;align-items:start;justify-content:space-between;gap:20px}
+.photo-section-heading strong{display:block;font-size:13px;color:#503544;letter-spacing:.015em}
+.photo-section-heading small{display:block;color:#947f85;font-size:11px;line-height:1.6;margin-top:4px}
+.photo-section-heading>span{font-size:11px;color:#854b62;border-radius:20px;background:#f9eded;padding:6px 10px;white-space:nowrap}
+.product-form-grid .photo-upload-action{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:10px;min-height:92px;padding:20px;text-align:center;border:1.5px dashed #b98597;border-radius:14px;background:linear-gradient(130deg,#fffaf6,#f8ebec);color:#744759;font-size:12px;font-weight:800;cursor:pointer;transition:background .2s,border .2s}
+.product-form-grid .photo-upload-action:hover{border-color:#80445c;background:#f7e7e7}
+.product-form-grid .photo-upload-action:has(input:disabled){opacity:.5;cursor:not-allowed}
+.product-form-grid .photo-upload-action input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.photo-editor-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
+.photo-editor-tile{position:relative;aspect-ratio:1;border-radius:12px;background:#f8efeb;overflow:hidden;border:1px solid #eadad7}
+.photo-editor-tile img{display:block;width:100%;height:100%;object-fit:cover}
+.photo-editor-tile.pending{border:2px dashed #af7287}
+.photo-cover-label{position:absolute;left:6px;top:6px;background:#532d3fe6;color:white;font-size:9px;font-weight:700;padding:5px 7px;border-radius:6px}
+.photo-editor-actions{position:absolute;bottom:6px;right:6px;display:flex;gap:4px}
+.photo-editor-actions button{display:grid;place-items:center;width:29px;height:29px;border-radius:8px;background:#fffdf7;border:1px solid #f1e1de;color:#704257;cursor:pointer;box-shadow:0 3px 14px #33202222}
+.photo-editor-actions button:hover{background:#f6e2e6}
+.photo-helper{font-size:11px;line-height:1.65;color:#99878c}
+.upload-status{display:flex;align-items:center;gap:9px;color:#814b62;font-size:12px;font-weight:700;margin:14px 0}
+.social-settings-panel{max-width:760px}
+.social-settings-heading{display:flex;justify-content:space-between;align-items:start;gap:18px;margin-bottom:26px}
+.social-settings-heading h2{font:600 28px var(--font-display),serif;color:#4c2b38}
+.social-settings-heading p{font-size:12px;line-height:1.7;color:#9a858e;margin-top:6px;max-width:500px}
+.social-settings-heading>span{font-size:10px;font-weight:800;letter-spacing:.09em;padding:8px 11px;border:1px solid #ead9db;color:#956b78;border-radius:100px;white-space:nowrap}
+.social-link-field{display:flex;align-items:center;gap:15px;border:1px solid #eee3e1;background:#fffdfb;border-radius:14px;padding:12px 15px;margin-bottom:12px;min-width:0}
+.social-link-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;background:#f7e9e9;color:#7a495f;border-radius:12px}
+.social-link-content{flex:1;min-width:0}
+.social-link-content strong{display:block;font-size:12px;color:#4e3340;margin-bottom:6px}
+.social-link-content input{width:100%;max-width:100%;font-size:12px;color:#4b3841;padding:8px 10px;border:1px solid #eadbdc;border-radius:8px;background:#fff}
+.social-link-content input:focus{outline:2px solid #d4a9b6;outline-offset:1px}
+.social-field-preview{color:#835067;flex:none;border-radius:8px;padding:8px}
+.social-field-preview:hover{background:#f8e9ec}
+.social-rules-warning{font-size:12px;line-height:1.6;color:#965a36;background:#fff1e7;border:1px solid #f5d3b5;border-radius:10px;padding:12px;margin:14px 0}
+.social-saved{display:flex;align-items:center;gap:8px;font-size:12px;color:#427653;font-weight:700;margin:14px 0}
+.social-save{margin-top:16px}
+.social-follow{display:flex;align-items:center;justify-content:space-between;gap:40px;padding-top:78px;padding-bottom:78px;background:#fffaf3}
+.social-follow h2{font:500 clamp(32px,3vw,49px) var(--font-display),serif;letter-spacing:-.03em;color:#4c2e38;margin:12px 0}
+.social-follow h2 em{color:#ac7481;font-weight:400}
+.social-follow p{max-width:375px;font-size:12px;line-height:1.7;color:#88757b}
+.social-public-links{display:grid;grid-template-columns:repeat(2,minmax(145px,1fr));gap:10px;min-width:min(100%,360px)}
+.social-public-links a,.social-public-links>span{display:flex;align-items:center;gap:11px;padding:15px 16px;border:1px solid #e9dad4;border-radius:12px;color:#674152;font-size:12px;font-weight:700;background:#fff;transition:transform .2s,background .2s,border .2s}
+.social-public-links a:hover{background:#f6e9e6;border-color:#d2a9b0;transform:translateY(-3px)}
+.social-public-links .social-arrow{margin-left:auto;transform:rotate(-35deg);opacity:.7}
+.social-public-links .social-unlinked{opacity:.46;cursor:default;border-style:dashed}
+@media(max-width:770px){.social-follow{flex-direction:column;align-items:stretch;gap:24px;padding-top:60px;padding-bottom:60px}.social-public-links{width:100%;min-width:0}}
+@media(max-width:430px){.photo-editor-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.social-public-links{grid-template-columns:repeat(2,minmax(0,1fr))}.social-public-links a,.social-public-links>span{gap:7px;font-size:10px;padding:13px 10px}.social-public-links svg{width:18px;height:18px}.social-link-field{gap:8px;padding:10px}.social-link-icon{width:35px;height:35px}.social-settings-heading{flex-direction:column}}
