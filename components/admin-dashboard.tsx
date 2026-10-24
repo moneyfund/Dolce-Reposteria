@@ -27,6 +27,7 @@ export default function AdminDashboard() {
   const [products,setProducts]=useState<Product[]>([]);
   const [promotions,setPromotions]=useState<Promotion[]>([]);
   const [authenticated,setAuthenticated]=useState(false);
+  const [account,setAccount]=useState<{email:string;uid:string;isAnonymous:boolean}|null>(null);
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState("");
@@ -45,25 +46,27 @@ export default function AdminDashboard() {
     try{
       const staff=await getDoc(doc(db(),"staff",user.uid));
       if(!staff.exists() || !["owner","admin"].includes(staff.data().role)){
-        throw new Error("Tu cuenta no tiene permisos administrativos. En Firestore crea staff/"+user.uid+" con role: owner.");
+        throw new Error("Google reconoció tu cuenta, pero no encontramos un permiso administrativo activo. Verifica en el proyecto dolce-reposteria el documento staff/"+user.uid+" y el campo role (texto): owner.");
       }
       const [o,p,promos]=await Promise.all([
         getDocs(query(collection(db(),"orders"),orderBy("createdAt","desc"),limit(150))),
         getDocs(query(collection(db(),"products"),limit(150))),
         getDocs(query(collection(db(),"promotions"),limit(50))),
       ]);
+      if(firebaseAuth().currentUser?.uid!==user.uid)return;
       setOrders(o.docs.map(s=>orderFromFirestore(s.id,s.data())));
       setProducts(p.docs.map(s=>({...s.data(),id:s.id} as Product)));
       setPromotions(promos.docs.map(s=>({...s.data(),id:s.id} as Promotion)));
       setAuthenticated(true);setError("");
-    }catch(e){setError(readableError(e));setAuthenticated(false);}
+    }catch(e){if(firebaseAuth().currentUser?.uid!==user.uid)return;setError(readableError(e));setAuthenticated(false);}
   },[]);
   useEffect(()=>{
     if(!hasFirebaseClient){setLoading(false);setError("Firebase todavía no está configurado.");return;}
     const unsub=onAuthStateChanged(firebaseAuth(),async user=>{
       setUserName(user?.displayName||"Equipo DOLCE");
-      if(user)await refresh();
-      else setAuthenticated(false);
+      setAccount(user?{email:user.email||"",uid:user.uid,isAnonymous:user.isAnonymous}:null);
+      if(user && !user.isAnonymous)await refresh();
+      else {setAuthenticated(false);setError("");}
       setLoading(false);
     });
     return()=>unsub();
@@ -93,6 +96,8 @@ export default function AdminDashboard() {
     catch(e){setError(readableError(e));}
     finally{setLoading(false);}
   }
+  async function recheckAccess(){setLoading(true);try{await refresh();}finally{setLoading(false);}}
+  async function switchAccount(){setLoading(true);setError("");try{await signOut(firebaseAuth());}catch(e){setError(readableError(e));}finally{setLoading(false);}}
   async function changeStatus(order:Order,status:OrderStatus){
     setSaving(true);setError("");
     try{
@@ -152,7 +157,7 @@ export default function AdminDashboard() {
   const displayedProducts=products.filter(p=>(p.name+" "+p.category).toLowerCase().includes(search.toLowerCase()));
   function navigate(next:View){setView(next);setSearch("");setSideOpen(false);}
   if(loading)return <div className="admin-center"><div className="spinner"/>Cargando DOLCE Manager...</div>;
-  if(!authenticated)return <div className="login-page"><a href="/" className="login-back"><ArrowLeft size={17}/> Volver a la tienda</a><div className="login-card"><span className="login-symbol">✳</span><span className="eyebrow">DOLCE REPOSTERÍA</span><h1>Tu espacio de <em>creación.</em></h1><p>Gestiona pedidos, productos y todo lo que hace especial a DOLCE.</p>{error&&<div className="form-error">{error}</div>}<button className="button-dark wide" onClick={login}>Continuar con Google <ArrowRight size={18}/></button><small>Acceso exclusivo para personal autorizado.</small></div></div>;
+  if(!authenticated)return <div className="login-page"><a href="/" className="login-back"><ArrowLeft size={17}/> Volver a la tienda</a><div className="login-card"><span className="login-symbol">✳</span><span className="eyebrow">DOLCE REPOSTERÍA</span><h1>Tu espacio de <em>creación.</em></h1><p>Gestiona pedidos, productos y todo lo que hace especial a DOLCE.</p>{error&&<div className="form-error" role="alert">{error}</div>}{account&&!account.isAnonymous&&<div className="login-recovery"><strong>Cuenta identificada</strong><span>{account.email||"Cuenta de Google"}</span><small>UID de Firebase</small><code>{account.uid}</code><a href="/admin/acceso">Ver los pasos para recuperar el acceso <ArrowRight size={15}/></a><button type="button" onClick={()=>void switchAccount()}>Usar otra cuenta de Google</button></div>}<button className="button-dark wide" onClick={()=>void (account&&!account.isAnonymous?recheckAccess():login())}>{account&&!account.isAnonymous?"Comprobar acceso de nuevo":"Continuar con Google"} <ArrowRight size={18}/></button><small>Acceso exclusivo para personal autorizado.</small></div></div>;
   return <div className="admin-app">
     {sideOpen&&<button className="sidebar-overlay" aria-label="Cerrar menú" onClick={()=>setSideOpen(false)}/>}
     <aside className={"admin-sidebar "+(sideOpen?"open":"")}><div className="admin-sidebar-top"><a href="/" className="admin-logo">dolce<span>.</span><small>MANAGER</small></a><span className="workspace-label">ESPACIO DE TRABAJO</span><nav className="admin-nav" aria-label="Administración">{tabs.map(item=>{const Icon=item.icon;return <button key={item.id} className={view===item.id?"active":""} onClick={()=>navigate(item.id)}><Icon size={19}/>{item.label}{item.id==="pedidos"&&newOrders>0&&<span className="nav-count">{newOrders}</span>}</button>;})}</nav></div><div className="admin-sidebar-bottom"><div className="sidebar-tip"><Sparkles size={19}/><strong>Tu negocio, más cerca.</strong><p>Todo lo que necesitas en un solo lugar.</p></div><a className="sidebar-store" href="/" target="_blank" rel="noreferrer"><ShoppingBag size={18}/> Ver tienda <ArrowRight size={16}/></a>{<button className="sidebar-logout" onClick={()=>signOut(firebaseAuth())}><LogOut size={16}/> Cerrar sesión</button>}</div></aside>

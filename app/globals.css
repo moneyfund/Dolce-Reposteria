@@ -299,3 +299,12 @@ img{display:block;max-width:100%}
 /* Featured carousel control in the product editor */
 .product-form-grid label.feature-product-toggle{display:flex;align-items:center;flex-direction:row;gap:10px;color:#654251;font-size:12px;font-weight:750;cursor:pointer}
 .product-form-grid label.feature-product-toggle input{width:18px;height:18px;accent-color:#6b3449;flex:none}
+
+/* Identity-aware owner access recovery. Firestore roles remain restricted. */
+.login-recovery{border:1px solid #e9d5d8;background:#fff3ef;border-radius:13px;padding:15px 16px;display:flex;flex-direction:column;align-items:flex-start;gap:7px;margin:14px 0 18px;min-width:0}
+.login-recovery strong{font-size:12px;color:#633448}.login-recovery span{font-size:12px;color:#694956;overflow-wrap:anywhere}
+.login-recovery small{font-size:10px!important;color:#927885!important;margin:2px 0 0!important}
+.login-recovery code{font-size:11px;color:#5b3444;overflow-wrap:anywhere;word-break:break-all}
+.login-recovery a{font-size:11px;font-weight:800;color:#82445b;display:inline-flex;align-items:center;gap:7px;margin-top:4px}
+.login-recovery a:hover{text-decoration:underline}
+.login-recovery button{border:0;background:transparent;padding:4px 0;color:#835165;text-decoration:underline;font-size:11px;font-weight:700}
