@@ -4,8 +4,9 @@ export const productSchema = z.object({
   name: z.string().trim().min(2).max(120),
   category: z.enum(["Pasteles", "Cupcakes", "Postres", "Panadería", "Detalles"]),
   description: z.string().trim().max(400),
-  price: z.number().finite().min(1).max(100000),
+  price: z.number().int().min(1).max(100000),
   image: z.string().url().max(2000).refine(value => value.startsWith("https://"), "HTTPS requerido"),
+  images: z.array(z.string().url().max(2000).refine(value => value.startsWith("https://"))).min(1).max(8).optional(),
   badge: z.string().max(30).optional(),
   featured: z.boolean().optional(),
   active: z.boolean(),
@@ -27,3 +28,18 @@ export const orderSchema = z.object({
 export const statuses = ["Nuevo","Confirmado","Preparando","Listo","Entregado","Cancelado"] as const;
 
 export const promotionSchema = z.object({id:z.string().min(2).max(80).regex(/^[a-z0-9-]+$/),title:z.string().trim().min(3).max(100),subtitle:z.string().trim().max(240),eyebrow:z.string().trim().min(2).max(40),image:z.string().url().max(2000).refine(v=>v.startsWith("https://")),ctaLabel:z.string().trim().min(2).max(40),active:z.boolean()});
+
+const socialUrl = (hosts: string[]) => z.string().trim().max(500).refine(value => {
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === "https:" && !url.username && !url.password && hosts.some(h => host === h || host.endsWith("." + h));
+  } catch { return false; }
+}, "Introduce un enlace HTTPS válido de la red social.");
+export const socialLinksSchema = z.object({
+  instagram: socialUrl(["instagram.com"]),
+  facebook: socialUrl(["facebook.com","fb.com","fb.me"]),
+  tiktok: socialUrl(["tiktok.com"]),
+  whatsapp: socialUrl(["wa.me","whatsapp.com"]),
+}).strict();

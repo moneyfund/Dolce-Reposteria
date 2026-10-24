@@ -6,6 +6,7 @@ export type Product = {
   description: string;
   price: number;
   image: string;
+  images?: string[];
   badge?: string;
   featured?: boolean;
   active: boolean;
@@ -28,3 +29,8 @@ export type Order = {
 export type Promotion = { id: string; title: string; subtitle: string; eyebrow: string; image: string; ctaLabel: string; active: boolean };
 export const categories = ["Todos", "Pasteles", "Cupcakes", "Postres", "Panadería", "Detalles"] as const;
 export const currency = (amount: number) => new Intl.NumberFormat("es-NI", { style: "currency", currency: "NIO", maximumFractionDigits: 0 }).format(amount);
+
+export type SocialLinks = { instagram: string; facebook: string; tiktok: string; whatsapp: string };
+export const emptySocialLinks: SocialLinks = {instagram:"",facebook:"",tiktok:"",whatsapp:""};
+export const productPhotos = (product: Pick<Product,"image"|"images">): string[] =>
+  [...new Set([...(product.images?.length ? product.images : []), product.image].filter(Boolean))].slice(0,8);

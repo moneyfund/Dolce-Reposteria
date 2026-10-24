@@ -12,7 +12,7 @@ service cloud.firestore {
     }
     function productData(d) {
       return d.keys().hasAll(['name','description','category','price','image','active','stock'])
-        && d.keys().hasOnly(['name','description','category','price','image','active','stock','badge','featured','updatedAt'])
+        && d.keys().hasOnly(['name','description','category','price','image','active','stock','badge','featured','images','updatedAt'])
         && d.name is string && d.name.size() >= 2 && d.name.size() <= 120
         && d.description is string && d.description.size() <= 400
         && d.category in ['Pasteles','Cupcakes','Postres','Panadería','Detalles']
@@ -21,7 +21,35 @@ service cloud.firestore {
         && d.active is bool
         && (d.stock == null || (d.stock is int && d.stock >= 0 && d.stock <= 100000))
         && d.get('badge','') is string && d.get('badge','').size() <= 30
-        && d.get('featured',false) is bool;
+        && d.get('featured',false) is bool
+        && validProductImages(d);
+    }
+    // New products have a photo gallery. Old products with one image remain valid.
+    function validPhotoUrl(url) {
+      return url is string && url.size() <= 2000 && url.matches('https://.*');
+    }
+    function validProductImages(d) {
+      let imgs = d.get('images', []);
+      return imgs is list && imgs.size() <= 8
+        && (imgs.size() == 0 || d.image == imgs[0])
+        && (imgs.size() < 1 || validPhotoUrl(imgs[0]))
+        && (imgs.size() < 2 || validPhotoUrl(imgs[1]))
+        && (imgs.size() < 3 || validPhotoUrl(imgs[2]))
+        && (imgs.size() < 4 || validPhotoUrl(imgs[3]))
+        && (imgs.size() < 5 || validPhotoUrl(imgs[4]))
+        && (imgs.size() < 6 || validPhotoUrl(imgs[5]))
+        && (imgs.size() < 7 || validPhotoUrl(imgs[6]))
+        && (imgs.size() < 8 || validPhotoUrl(imgs[7]));
+    }
+    function validSocialLink(value) {
+      return value is string && value.size() <= 500
+        && (value == '' || value.matches('https://[^ ]+'));
+    }
+    function socialData(d) {
+      return d.keys().hasAll(['instagram','facebook','tiktok','whatsapp'])
+        && d.keys().hasOnly(['instagram','facebook','tiktok','whatsapp'])
+        && validSocialLink(d.instagram) && validSocialLink(d.facebook)
+        && validSocialLink(d.tiktok) && validSocialLink(d.whatsapp);
     }
     function promotionData(d) {
       return d.keys().hasAll(['title','subtitle','eyebrow','image','ctaLabel','active'])
@@ -42,6 +70,12 @@ service cloud.firestore {
       allow get, list: if isOwner() || resource.data.active == true;
       allow create, update: if isOwner() && promotionData(request.resource.data);
       allow delete: if false;
+    }
+    match /settings/{settingId} {
+      allow get: if settingId == 'social';
+      allow list, delete: if false;
+      allow create, update: if settingId == 'social'
+        && isOwner() && socialData(request.resource.data);
     }
     // Colección obsoleta; los permisos ya no dependen de documentos staff.
     match /staff/{uid} {
