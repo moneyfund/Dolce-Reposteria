@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowDownRight, ArrowLeft, ArrowRight, Check, ChevronDown, Heart, Instagram, MapPin, Menu, Minus, Plus, Search, ShoppingBag, Sparkles, Star, Trash2, X } from "lucide-react";
-import { categories, currency, type CartItem, type Category, type Product, type DeliveryMethod, type Promotion } from "@/lib/types";
+import { ArrowDownRight, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, Heart, Instagram, Facebook, Music2, MessageCircle, MapPin, Menu, Minus, Plus, Search, ShoppingBag, Sparkles, Star, Trash2, X } from "lucide-react";
+import { categories, currency, type CartItem, type Category, type Product, type DeliveryMethod, type Promotion, type SocialLinks, emptySocialLinks, productPhotos } from "@/lib/types";
 
 import { checkCatalogReady, createCustomerOrder, readableError } from "@/lib/firestore-commerce";
+import { socialLinksSchema } from "@/lib/validation";
 import { firebaseApp, hasFirebaseClient } from "@/lib/firebase-client";
-import { collection, getFirestore, limit, onSnapshot, query, where } from "firebase/firestore";
+import { collection, doc, getFirestore, limit, onSnapshot, query, where } from "firebase/firestore";
 const CART_KEY = "dolce-cart-v1";
 const heroImage = "https://images.unsplash.com/photo-1464305795204-6f5bbfc7fb81?w=1400&auto=format&fit=crop&q=88";
 // Logotipo original DOLCE con fondo transparente, servido como recurso local.
@@ -14,10 +15,18 @@ const logoImage = "/dolce-logo-transparent.png";
 const detailImage = "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=1200&auto=format&fit=crop&q=85";
 const reveal = { initial: { opacity: 0, y: 24 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: "-70px" }, transition: { duration: .55 } };
 function ProductCard({ product, onAdd, index }: { product: Product; onAdd: (p: Product) => void; index: number }) {
+  const [photoIndex,setPhotoIndex]=useState(0);
+  const photos=productPhotos(product);
+  const current=photos[photoIndex%Math.max(photos.length,1)]||product.image;
   return <motion.article {...reveal} whileHover={{y:-9}} transition={{type:"spring", stiffness:250, damping:25, delay: Math.min(index * .045,.15)}} className="product-card">
     <div className="product-image-wrap">
-      <img src={product.image} alt={product.name} loading="lazy" className="product-image" />
+      <AnimatePresence mode="wait" initial={false}><motion.img key={current} src={current} alt={product.name+" · fotografía "+(photoIndex%photos.length+1)} loading="lazy" className="product-image" initial={{opacity:.65,scale:1.025}} animate={{opacity:1,scale:1}} exit={{opacity:.65}} transition={{duration:.24}} /></AnimatePresence>
       {product.badge && <span className="product-badge">{product.badge}</span>}
+      {photos.length>1&&<div className="product-gallery-control">
+        <button type="button" aria-label={"Fotografía anterior de "+product.name} onClick={()=>setPhotoIndex(i=>(i+photos.length-1)%photos.length)}><ChevronLeft size={18}/></button>
+        <span>{photoIndex%photos.length+1} / {photos.length}</span>
+        <button type="button" aria-label={"Fotografía siguiente de "+product.name} onClick={()=>setPhotoIndex(i=>(i+1)%photos.length)}><ChevronRight size={18}/></button>
+      </div>}
       <motion.button type="button" whileHover={{scale:1.08,rotate:8}} whileTap={{scale:.92}} aria-label={"Agregar "+product.name} className="add-float" onClick={() => onAdd(product)} disabled={product.stock === 0}><Plus size={20}/></motion.button>
     </div>
     <div className="product-meta"><span>{product.category}</span><span className="product-price">{currency(product.price)}</span></div>
@@ -25,9 +34,16 @@ function ProductCard({ product, onAdd, index }: { product: Product; onAdd: (p: P
     <button className="card-action" type="button" onClick={() => onAdd(product)} disabled={product.stock === 0}>{product.stock === 0 ? "Agotado" : "Agregar al pedido"}<ArrowRight size={16}/></button>
   </motion.article>;
 }
+const SOCIAL_ITEMS:{id:keyof SocialLinks;label:string;icon:typeof Instagram}[]=[
+  {id:"instagram",label:"Instagram",icon:Instagram},
+  {id:"facebook",label:"Facebook",icon:Facebook},
+  {id:"tiktok",label:"TikTok",icon:Music2},
+  {id:"whatsapp",label:"WhatsApp",icon:MessageCircle},
+];
 export default function Storefront() {
   const [products,setProducts] = useState<Product[]>([]);
   const [promotions,setPromotions] = useState<Promotion[]>([]);
+  const [socialLinks,setSocialLinks] = useState<SocialLinks>({...emptySocialLinks});
   const [category,setCategory] = useState<string>("Todos");
   const [search,setSearch] = useState("");
   const [cart,setCart] = useState<CartItem[]>([]);
@@ -80,7 +96,10 @@ export default function Storefront() {
     const unsubPromotions=onSnapshot(query(collection(db,"promotions"),where("active","==",true),limit(30)),
       snap=>setPromotions(snap.docs.map(d=>({...d.data(),id:d.id} as Promotion))),
       ()=>setPromotions([]));
-    return()=>{unsubProducts();unsubPromotions();};
+    const unsubSocial=onSnapshot(doc(db,"settings","social"),
+      snap=>{const parsed=socialLinksSchema.safeParse(snap.data()??emptySocialLinks);setSocialLinks(parsed.success?parsed.data:{...emptySocialLinks});},
+      ()=>setSocialLinks({...emptySocialLinks}));
+    return()=>{unsubProducts();unsubPromotions();unsubSocial();};
   },[]);
   useEffect(()=>{ if(ready) localStorage.setItem(CART_KEY,JSON.stringify(cart)); },[cart,ready]);
   useEffect(()=>{
@@ -141,6 +160,7 @@ export default function Storefront() {
         <a href="#catalogo" onClick={navigate}>Productos</a>
         <a href="#especial" onClick={navigate}>Pedidos especiales</a>
         <a href="#promociones" onClick={navigate}>Promociones</a>
+        <a href="#redes" onClick={navigate}>Redes</a>
       </nav>
       <div className="header-actions">
         <button type="button" className="header-order" onClick={()=>setCartOpen(true)}>Hacer un pedido <ArrowRight size={16}/></button>
@@ -198,6 +218,12 @@ export default function Storefront() {
     </section>
     <section id="promociones" className="promo-section section-shell">{promotions.length>0&&<><div className="promo-header"><span className="eyebrow"><span className="eyebrow-line"/> ALGO ESPECIAL PARA TI</span><span>Selecciones de temporada ✳</span></div><div className="promo-grid">{promotions.map(promo=><motion.article {...reveal} className="promo-tile" key={promo.id}><img src={promo.image} alt={promo.title} loading="lazy"/><div className="promo-shade"/><div className="promo-tile-copy"><span>{promo.eyebrow}</span><h2>{promo.title}</h2><p>{promo.subtitle}</p><a href="#catalogo">{promo.ctaLabel} <ArrowRight size={17}/></a></div></motion.article>)}</div></>}</section>
     <section id="especial" className="special"><motion.div {...reveal} className="special-image"><img src={detailImage} alt="Selección de postres artesanales" loading="lazy"/><div className="special-seal">DOLCE<br/>♥<br/>MOMENTS</div></motion.div><motion.div {...reveal} className="special-copy"><span className="eyebrow"><span className="eyebrow-line"/> PARA TUS MOMENTOS</span><h2>Hay momentos que merecen <em>algo único.</em></h2><p>Cumpleaños, celebraciones o un simple «porque sí». Cuéntanos tu idea y hagamos que suceda.</p><a href="#catalogo" className="button-dark">Encontrar mi dulce <ArrowRight size={18}/></a><span className="special-decoration">✳</span></motion.div></section>
+    <section id="redes" className="social-follow section-shell" aria-labelledby="social-follow-title">
+      <div><span className="eyebrow"><span className="eyebrow-line"/> CONECTEMOS</span><h2 id="social-follow-title">Un poquito más de <em>DOLCE.</em></h2><p>Novedades, creaciones y momentos dulces, también en nuestras redes.</p></div>
+      <div className="social-public-links">
+        {SOCIAL_ITEMS.map(item=>{const Icon=item.icon;const link=socialLinks[item.id];return link?<a key={item.id} href={link} target="_blank" rel="noopener noreferrer" aria-label={"Visitar DOLCE en "+item.label} title={item.label}><Icon size={21}/><span>{item.label}</span><ArrowRight size={15} className="social-arrow"/></a>:<span key={item.id} className="social-unlinked" aria-label={item.label+" próximamente"} title={item.label+" · enlace pendiente"}><Icon size={21}/><span>{item.label}</span></span>})}
+      </div>
+    </section>
     <section className="closing-cta"><span className="eyebrow eyebrow-light">EL PLACER DE LO ARTESANAL</span><h2>Endulcemos tu <em>próximo momento.</em></h2><button onClick={()=>setCartOpen(true)} className="button-primary">Ver mi pedido <ShoppingBag size={18}/></button></section>
     <footer className="footer"><div className="footer-top"><a href="#inicio" className="footer-brand">dolce<span>.</span></a><span>Repostería hecha con amor, en Matagalpa.</span><a href="/admin" className="footer-admin">Acceso al equipo <ArrowRight size={14}/></a></div><div className="footer-bottom"><span>© {new Date().getFullYear()} DOLCE Repostería</span><span>El ingrediente secreto siempre es el cariño ♥</span></div></footer>
     <AnimatePresence>{cartOpen&&<><motion.div className="drawer-backdrop" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={()=>{setCartOpen(false);setCheckout(false);setError("");}}/><motion.aside className="cart-drawer" initial={{x:"100%"}} animate={{x:0}} exit={{x:"100%"}} transition={{type:"spring",damping:28,stiffness:260}} aria-label="Tu pedido"><div className="drawer-header"><div><span className="eyebrow">ALGO DULCE ESTÁ EN CAMINO</span><h2>{success?"¡Listo!":checkout?"Finaliza tu pedido":"Tu cajita dulce"} <span>♥</span></h2></div><button type="button" aria-label="Cerrar" onClick={()=>{setCartOpen(false);setCheckout(false);setSuccess(null);setError("");}}><X size={23}/></button></div>
