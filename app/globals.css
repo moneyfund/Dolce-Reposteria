@@ -295,3 +295,7 @@ img{display:block;max-width:100%}
 .access-disclaimer{font-size:10px!important;margin:22px 0 0!important;color:#a18a92!important}
 .access-card>.form-error{margin-top:14px}
 @media(max-width:600px){.access-card{padding:29px 21px}.access-card h1{font-size:39px}}
+
+/* Featured carousel control in the product editor */
+.product-form-grid label.feature-product-toggle{display:flex;align-items:center;flex-direction:row;gap:10px;color:#654251;font-size:12px;font-weight:750;cursor:pointer}
+.product-form-grid label.feature-product-toggle input{width:18px;height:18px;accent-color:#6b3449;flex:none}
