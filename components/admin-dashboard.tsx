@@ -1,15 +1,25 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis } from "recharts";
-import { ArrowDownLeft, ArrowLeft, ArrowRight, BarChart3, CalendarDays, Check, ChevronDown, ClipboardList, Eye, LayoutDashboard, LogOut, Menu, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Sparkles, TrendingUp, Users, Wallet, X } from "lucide-react";
-import { categories, currency, type Category, type Order, type OrderStatus, type Product, type Promotion } from "@/lib/types";
+import { ArrowDownLeft, ArrowLeft, ArrowRight, BarChart3, CalendarDays, Check, ChevronDown, ClipboardList, Eye, LayoutDashboard, LogOut, Menu, Package, Pencil, Plus, Search, Settings2, ShoppingBag, Sparkles, TrendingUp, Users, Wallet, X, ImagePlus, Trash2, Instagram, Facebook, Music2, MessageCircle, ExternalLink, UploadCloud } from "lucide-react";
+import { categories, currency, type Category, type Order, type OrderStatus, type Product, type Promotion, type SocialLinks, emptySocialLinks, productPhotos } from "@/lib/types";
 import { db, orderFromFirestore, readableError } from "@/lib/firestore-commerce";
-import { productSchema, promotionSchema } from "@/lib/validation";
+import { productSchema, promotionSchema, socialLinksSchema } from "@/lib/validation";
 import { firebaseApp, firebaseAuth, hasFirebaseClient } from "@/lib/firebase-client";
 import { collection, doc, getDocs, getFirestore, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from "firebase/firestore";
 import { getIdTokenResult, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { deleteObject, getDownloadURL, getStorage, ref as storageRef, uploadBytes } from "firebase/storage";
 const OWNER_EMAIL = "norvingarcia220@gmail.com";
-type View = "resumen" | "pedidos" | "productos" | "promociones" | "clientes";
+type View = "resumen" | "pedidos" | "productos" | "promociones" | "clientes" | "redes";
+type PendingImage = {file:File; preview:string};
+const MAX_PHOTOS=8;
+const MAX_IMAGE_BYTES=8*1024*1024;
+const SOCIAL_FIELDS:{id:keyof SocialLinks;label:string;placeholder:string;icon:typeof Instagram}[] = [
+  {id:"instagram",label:"Instagram",placeholder:"https://www.instagram.com/tu_cuenta/",icon:Instagram},
+  {id:"facebook",label:"Facebook",placeholder:"https://www.facebook.com/tu_pagina",icon:Facebook},
+  {id:"tiktok",label:"TikTok",placeholder:"https://www.tiktok.com/@tu_cuenta",icon:Music2},
+  {id:"whatsapp",label:"WhatsApp",placeholder:"https://wa.me/505XXXXXXXX",icon:MessageCircle},
+];
 const stateOptions: OrderStatus[] = ["Nuevo","Confirmado","Preparando","Listo","Entregado","Cancelado"];
 const emptyPromo: Promotion = {id:"",title:"",subtitle:"",eyebrow:"EDICIÓN ESPECIAL",image:"",ctaLabel:"Ver delicias",active:true};
 const emptyProduct: Product = { id:"",name:"",category:"Pasteles",description:"",price:0,image:"",stock:null,active:true,featured:false,badge:"" };
@@ -19,6 +29,7 @@ const tabs: {id:View;label:string;icon:typeof LayoutDashboard}[] = [
   {id:"productos",label:"Productos",icon:Package},
   {id:"promociones",label:"Promociones",icon:Sparkles},
   {id:"clientes",label:"Clientes",icon:Users},
+  {id:"redes",label:"Redes",icon:Instagram},
 ];
 const dateFormat=(date:string)=>{try{return new Date(date).toLocaleDateString("es-NI",{day:"numeric",month:"short"});}catch{return date;}};
 const statusClass=(status: OrderStatus)=>"status status-"+status.toLowerCase();
@@ -39,6 +50,11 @@ export default function AdminDashboard() {
   const [editingPromo,setEditingPromo]=useState<Promotion|null>(null);
   const [newPromo,setNewPromo]=useState(false);
   const [isNew,setIsNew]=useState(false);
+  const [pendingImages,setPendingImages]=useState<PendingImage[]>([]);
+  const [uploadStatus,setUploadStatus]=useState("");
+  const [social,setSocial]=useState<SocialLinks>({...emptySocialLinks});
+  const [socialSaved,setSocialSaved]=useState(false);
+  const [socialRulesError,setSocialRulesError]=useState(false);
   const [detail,setDetail]=useState<Order|null>(null);
   const [userName,setUserName]=useState("Equipo DOLCE");
   const refresh=useCallback(async()=>{
@@ -94,7 +110,10 @@ export default function AdminDashboard() {
     const unsubPromos=onSnapshot(query(collection(db(),"promotions"),limit(50)),
       snap=>setPromotions(snap.docs.map(s=>({...s.data(),id:s.id} as Promotion))),
       e=>setError(readableError(e)));
-    return()=>{unsubOrders();unsubProducts();unsubPromos();};
+    const unsubSocial=onSnapshot(doc(db(),"settings","social"),
+      snap=>{const parsed=socialLinksSchema.safeParse(snap.data()??emptySocialLinks);if(parsed.success)setSocial(parsed.data);setSocialRulesError(false);},
+      ()=>setSocialRulesError(true));
+    return()=>{unsubOrders();unsubProducts();unsubPromos();unsubSocial();};
   },[authenticated]);
   async function testConnection(){
     setConnection("checking");
@@ -122,19 +141,76 @@ export default function AdminDashboard() {
     }catch(e){setError(readableError(e));}
     finally{setSaving(false);}
   }
+  function discardPendingImages(){
+    setPendingImages(previous=>{previous.forEach(entry=>URL.revokeObjectURL(entry.preview));return [];});
+    setUploadStatus("");
+  }
+  function selectProductImages(event:React.ChangeEvent<HTMLInputElement>){
+    if(!editing)return;
+    const files=Array.from(event.target.files??[]);
+    event.target.value="";
+    if(!files.length)return;
+    const space=MAX_PHOTOS-productPhotos(editing).length-pendingImages.length;
+    if(files.length>space){setError("Puedes tener como máximo "+MAX_PHOTOS+" fotografías por producto.");return;}
+    const bad=files.find(file=>!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size===0||file.size>MAX_IMAGE_BYTES);
+    if(bad){setError("Solo JPG, PNG o WEBP de hasta 8 MB. Revisa: "+bad.name);return;}
+    setPendingImages(previous=>[...previous,...files.map(file=>({file,preview:URL.createObjectURL(file)}))]);
+    setError("");
+  }
+  function removePendingImage(preview:string){
+    setPendingImages(previous=>previous.filter(image=>{if(image.preview===preview){URL.revokeObjectURL(image.preview);return false;}return true;}));
+  }
+  function changeGallery(photos:string[]){
+    if(!editing)return;
+    setEditing({...editing,images:photos,image:photos[0]??""});
+  }
+  function closeProductEditor(){discardPendingImages();setEditing(null);setError("");}
+  function openProductEditor(product:Product,newProduct:boolean){
+    discardPendingImages();setEditing({...product,images:productPhotos(product)});
+    setIsNew(newProduct);setError("");
+  }
   async function saveProduct(event:React.FormEvent<HTMLFormElement>){
-    event.preventDefault();if(!editing)return;
+    event.preventDefault();if(!editing||saving)return;
     setError("");setSaving(true);
-    const candidate={...editing,id:editing.id.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""),
-      name:editing.name.trim(),image:editing.image.trim(),price:Number(editing.price),
-      stock:editing.stock===null?null:Number(editing.stock),featured:Boolean(editing.featured),badge:editing.badge||""};
-    const parsed=productSchema.safeParse(candidate);
-    if(!parsed.success){setError(parsed.error.issues[0]?.message||"Revisa los campos del producto.");setSaving(false);return;}
+    const id=editing.id.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+    const priorPhotos=productPhotos(editing);
+    const pending=[...pendingImages];
+    if(isNew&&products.some(p=>p.id===id)){setError("Ya existe un producto con ese identificador.");setSaving(false);return;}
+    if(priorPhotos.length+pending.length<1){setError("Agrega al menos una fotografía del producto.");setSaving(false);return;}
+    const temporaryImage="https://example.com/pending-upload";
+    const candidate={...editing,id,name:editing.name.trim(),image:priorPhotos[0]||temporaryImage,
+      images:priorPhotos.length?priorPhotos:[temporaryImage],
+      price:Number(editing.price),stock:editing.stock===null?null:Number(editing.stock),featured:Boolean(editing.featured),badge:editing.badge||""};
+    const validated=productSchema.safeParse(candidate);
+    if(!validated.success){setError(validated.error.issues[0]?.message||"Revisa los campos del producto.");setSaving(false);return;}
+    const uploadedRefs:ReturnType<typeof storageRef>[]=[];
     try{
-      const {id,...product}=parsed.data;
-      await setDoc(doc(db(),"products",id),{...product,updatedAt:serverTimestamp()},{merge:true});
-      setEditing(null);setIsNew(false);
-    }catch(e){setError(readableError(e));}
+      const uploadedUrls:string[]=[];
+      for(const [index,entry] of pending.entries()){
+        setUploadStatus("Subiendo fotografía "+(index+1)+" de "+pending.length+"...");
+        const ext=entry.file.type==="image/png"?"png":entry.file.type==="image/webp"?"webp":"jpg";
+        const imageRef=storageRef(getStorage(firebaseApp()),"catalog/products/"+id+"/"+crypto.randomUUID()+"."+ext);
+        await uploadBytes(imageRef,entry.file,{contentType:entry.file.type,cacheControl:"public,max-age=31536000,immutable"});
+        uploadedRefs.push(imageRef);
+        uploadedUrls.push(await getDownloadURL(imageRef));
+      }
+      const images=[...priorPhotos,...uploadedUrls];
+      const final=productSchema.parse({...candidate,image:images[0],images});
+      const {id:productId,...product}=final;
+      setUploadStatus("Guardando producto...");
+      await setDoc(doc(db(),"products",productId),{...product,updatedAt:serverTimestamp()},{merge:true});
+      closeProductEditor();setIsNew(false);
+    }catch(e){
+      await Promise.allSettled(uploadedRefs.map(reference=>deleteObject(reference)));
+      setError(readableError(e));setUploadStatus("");
+    }finally{setSaving(false);}
+  }
+  async function saveSocial(event:React.FormEvent<HTMLFormElement>){
+    event.preventDefault();setError("");setSaving(true);setSocialSaved(false);
+    const parsed=socialLinksSchema.safeParse(social);
+    if(!parsed.success){setError(parsed.error.issues[0]?.message||"Revisa los enlaces.");setSaving(false);return;}
+    try{await setDoc(doc(db(),"settings","social"),parsed.data);setSocialSaved(true);}
+    catch(e){setError(readableError(e)+". Si son permisos, publica firestore.rules en Firebase Console.");}
     finally{setSaving(false);}
   }
   async function toggleProduct(product:Product){
@@ -185,7 +261,7 @@ export default function AdminDashboard() {
         <div className="admin-overview-grid"><section className="admin-panel chart-panel"><div className="panel-header"><div><span className="eyebrow">PULSO COMERCIAL</span><h2>Pedidos de la semana</h2></div><span className="panel-chip"><TrendingUp size={15}/> Últimos 7 días</span></div><div className="chart-wrap"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData} margin={{top:18,right:10,left:10,bottom:0}}><defs><linearGradient id="sales" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#bc677e" stopOpacity={.28}/><stop offset="100%" stopColor="#bc677e" stopOpacity={0}/></linearGradient></defs><CartesianGrid stroke="#efe8e3" vertical={false}/><XAxis dataKey="day" tickLine={false} axisLine={false} tick={{fill:"#8f8482",fontSize:12}}/><Tooltip formatter={(v)=>currency(Number(v))} contentStyle={{borderRadius:14,border:"1px solid #f0e5e0"}}/><Area type="monotone" dataKey="ventas" stroke="#9d4565" strokeWidth={3} fill="url(#sales)"/></AreaChart></ResponsiveContainer></div></section><section className="admin-panel attention-panel"><div className="panel-header"><div><span className="eyebrow">A LA VISTA</span><h2>Por atender</h2></div><span className="attention-icon">✳</span></div><strong className="attention-number">{pending.toString().padStart(2,"0")}</strong><p>pedidos necesitan seguimiento</p><button className="button-dark wide" onClick={()=>navigate("pedidos")}>Gestionar pedidos <ArrowRight size={17}/></button></section></div>
         <section className="admin-panel"><div className="panel-header"><div><span className="eyebrow">MOVIMIENTO RECIENTE</span><h2>Últimos pedidos</h2></div><button className="text-link" onClick={()=>navigate("pedidos")}>Ver todos <ArrowRight size={16}/></button></div><OrderTable orders={orders.slice(0,5)} onSelect={setDetail}/></section></>}
       {view==="pedidos"&&<><div className="admin-page-title"><div><span className="eyebrow">OPERACIÓN DIARIA</span><h1>Gestión de <em>pedidos.</em></h1><p>Del primer antojo hasta la entrega.</p></div><span className="today-tag">{orders.length} pedidos</span></div><div className="admin-panel"><div className="list-toolbar"><label className="admin-search"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar pedido o cliente" /></label><button className="toolbar-refresh" onClick={()=>void refresh()}>Actualizar <ArrowRight size={16}/></button></div><OrderTable orders={displayedOrders} onSelect={setDetail}/></div></>}
-      {view==="productos"&&<><div className="admin-page-title"><div><span className="eyebrow">TU VITRINA DIGITAL</span><h1>Productos con <em>personalidad.</em></h1><p>Tu catálogo, siempre al día.</p></div><button className="button-dark" onClick={()=>{setEditing({...emptyProduct});setIsNew(true);setError("");}}><Plus size={17}/> Nuevo producto</button></div><div className="admin-panel"><div className="list-toolbar"><label className="admin-search"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar producto" /></label><span className="list-counter">{products.length} productos</span></div><div className="admin-products">{displayedProducts.map(p=><div className="admin-product" key={p.id}><img src={p.image} alt={p.name}/><div className="admin-product-name"><strong>{p.name}</strong><span>{p.category}</span></div><span className="admin-product-price">{currency(p.price)}</span><span className={"stock-badge "+(p.stock===0?"out":"")}>{p.stock===null?"Sin límite":p.stock+" unidades"}</span><button className={"visibility-toggle "+(p.active?"on":"")} onClick={()=>void toggleProduct(p)} aria-label={p.active?"Ocultar producto":"Mostrar producto"} title={p.active?"Visible":"Oculto"}><span/></button><button className="icon-button" onClick={()=>{setEditing({...p});setIsNew(false);setError("");}} aria-label={"Editar "+p.name}><Pencil size={17}/></button></div>)}{displayedProducts.length===0&&<p className="admin-empty">No hay productos para mostrar.</p>}</div></div></>}
+      {view==="productos"&&<><div className="admin-page-title"><div><span className="eyebrow">TU VITRINA DIGITAL</span><h1>Productos con <em>personalidad.</em></h1><p>Tu catálogo, siempre al día.</p></div><button className="button-dark" onClick={()=>openProductEditor({...emptyProduct},true)}><Plus size={17}/> Nuevo producto</button></div><div className="admin-panel"><div className="list-toolbar"><label className="admin-search"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar producto" /></label><span className="list-counter">{products.length} productos</span></div><div className="admin-products">{displayedProducts.map(p=><div className="admin-product" key={p.id}><img src={p.image} alt={p.name}/><div className="admin-product-name"><strong>{p.name}</strong><span>{p.category}</span></div><span className="admin-product-price">{currency(p.price)}</span><span className={"stock-badge "+(p.stock===0?"out":"")}>{p.stock===null?"Sin límite":p.stock+" unidades"}</span><button className={"visibility-toggle "+(p.active?"on":"")} onClick={()=>void toggleProduct(p)} aria-label={p.active?"Ocultar producto":"Mostrar producto"} title={p.active?"Visible":"Oculto"}><span/></button><button className="icon-button" onClick={()=>openProductEditor(p,false)} aria-label={"Editar "+p.name}><Pencil size={17}/></button></div>)}{displayedProducts.length===0&&<p className="admin-empty">No hay productos para mostrar.</p>}</div></div></>}
       {view==="promociones"&&<><div className="admin-page-title"><div><span className="eyebrow">CAMPAÑAS Y DESTACADOS</span><h1>Promociones que <em>conectan.</em></h1><p>Gestiona los destacados visibles en la tienda.</p></div><button className="button-dark" onClick={()=>{setEditingPromo({...emptyPromo});setNewPromo(true);setError("");}}><Plus size={17}/> Nueva promoción</button></div><div className="admin-panel"><div className="promo-admin-grid">{promotions.map(p=><article className="promo-admin-card" key={p.id}><img src={p.image} alt={p.title}/><div><span className="eyebrow">{p.eyebrow}</span><h3>{p.title}</h3><p>{p.subtitle}</p><div className="promo-admin-actions"><span className={"status "+(p.active?"status-entregado":"status-cancelado")}>{p.active?"Visible":"Oculta"}</span><button onClick={()=>void togglePromotion(p)}>{p.active?"Ocultar":"Publicar"}</button><button onClick={()=>{setEditingPromo({...p});setNewPromo(false);setError("");}}><Pencil size={15}/> Editar</button></div></div></article>)}{promotions.length===0&&<div className="admin-empty">Crea tu primera campaña para mostrarla en la tienda.</div>}</div></div></>}
       {view==="clientes"&&<><div className="admin-page-title"><div><span className="eyebrow">COMUNIDAD DOLCE</span><h1>Personas que nos <em>eligen.</em></h1><p>Conoce a tus clientes y sus pedidos.</p></div><span className="today-tag">{customers.length} clientes</span></div><div className="admin-panel"><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Cliente</th><th>Teléfono</th><th>Pedidos</th><th>Compras registradas</th></tr></thead><tbody>{customers.map(customer=>{const customerOrders=orders.filter(o=>o.customer.phone===customer.phone);return <tr key={customer.phone}><td><strong>{customer.name}</strong></td><td>{customer.phone}</td><td>{customerOrders.length}</td><td>{currency(customerOrders.filter(o=>o.status!=="Cancelado").reduce((sum,o)=>sum+o.total,0))}</td></tr>;})}</tbody></table>{customers.length===0&&<div className="admin-empty">Todavía no hay clientes registrados.</div>}</div></div></>}
       </div></div>
