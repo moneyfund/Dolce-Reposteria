@@ -401,3 +401,22 @@ img{display:block;max-width:100%}
 .admin-order-whatsapp{display:inline-flex;align-items:center;gap:8px;border-radius:12px;padding:11px 15px;margin:8px 0 14px;background:#e3f6e9;color:#185f38;font-size:13px;font-weight:750}
 .admin-order-whatsapp:hover{background:#c9ecd5}
 @media(max-width:640px){.admin-alert-button{padding:7px 10px;font-size:11px}}
+
+/* Gestión de clientes y eliminación de productos */
+.footer-policy{justify-content:center;text-align:center}
+.admin-product-delete{color:#ae3f54!important}
+.admin-product-delete:hover{background:#fff0f1!important;color:#8f2438!important}
+.admin-client-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.admin-client-action{display:inline-flex;gap:6px;align-items:center;justify-content:center;padding:8px 11px;border:1px solid #e8dadb;border-radius:10px;background:#fff;color:#67404f;font-size:12px;font-weight:700;white-space:nowrap}
+.admin-client-action:hover{background:#fff1f4}
+.admin-client-action.danger{color:#ad354d;border-color:#efced3}
+.admin-client-action.danger:hover{background:#fff0f1}
+.admin-client-action:disabled{opacity:.4;cursor:not-allowed}
+.admin-client-warning{margin:16px 20px;padding:12px 15px;border-radius:12px;background:#fff3e9;color:#7f4730;font-size:13px;line-height:1.55}
+.admin-clients-toolbar{justify-content:space-between}
+.admin-clients-note{font-size:12px;line-height:1.65;color:#7c7073;padding:0 22px 18px;margin:0}
+.admin-client-modal{max-width:520px;width:min(520px,calc(100vw - 28px))}
+.admin-client-modal>p{font-size:13px;color:#7c7073;line-height:1.6}
+.admin-client-modal>label{display:grid;gap:8px;font-size:13px;font-weight:700;margin:20px 0}
+.admin-client-modal input{padding:12px 14px;border:1px solid #e5d8d9;border-radius:12px;width:100%;font-weight:500}
+.admin-client-modal .admin-clients-note{padding:0;margin:0 0 16px}

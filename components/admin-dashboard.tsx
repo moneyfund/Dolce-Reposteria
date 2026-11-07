@@ -6,7 +6,7 @@ import { categories, currency, type Category, type Order, type OrderStatus, type
 import { db, orderFromFirestore, readableError } from "@/lib/firestore-commerce";
 import { productSchema, promotionSchema, socialLinksSchema } from "@/lib/validation";
 import { firebaseApp, firebaseAuth, hasFirebaseClient } from "@/lib/firebase-client";
-import { collection, doc, getDocs, getFirestore, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, startAfter, type QueryDocumentSnapshot, type DocumentData } from "firebase/firestore";
+import { collection, doc, getDocs, getFirestore, limit, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, startAfter, deleteDoc, type QueryDocumentSnapshot, type DocumentData } from "firebase/firestore";
 import { getIdTokenResult, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { deleteObject, getDownloadURL, getStorage, ref as storageRef, uploadBytes } from "firebase/storage";
 const AUTHORIZED_ADMIN_EMAILS = ["norvingarcia220@gmail.com"]; // Incorporar aquí el correo del propietario cuando lo confirme.
@@ -33,6 +33,13 @@ const tabs: {id:View;label:string;icon:typeof LayoutDashboard}[] = [
 ];
 const dateFormat=(date:string)=>{try{return new Date(date).toLocaleDateString("es-NI",{day:"numeric",month:"short"});}catch{return date;}};
 const statusClass=(status: OrderStatus)=>"status status-"+status.toLowerCase();
+const customerKey=(phone:string):string=>{
+  const digits=phone.replace(/\D/g,"");
+  const normalized=digits.length===8?"505"+digits:digits;
+  return /^\d{8,15}$/.test(normalized)?normalized:"";
+};
+type CustomerProfile = {name:string;phone:string;archived:boolean};
+type CustomerEntry = {id:string;name:string;phone:string;archived:boolean;orderCount:number;requestedAmount:number};
 const orderWhatsApp=(order:Order):string|null=>{
   const raw=order.customer.phone.replace(/\D/g,"");
   const phone=raw.length===8?"505"+raw:raw;
@@ -49,6 +56,11 @@ export default function AdminDashboard() {
   const [loadingMoreOrders,setLoadingMoreOrders]=useState(false);
   const [alertsEnabled,setAlertsEnabled]=useState(false);
   const [products,setProducts]=useState<Product[]>([]);
+  const [customerProfiles,setCustomerProfiles]=useState<Record<string,CustomerProfile>>({});
+  const [customerProfilesError,setCustomerProfilesError]=useState(false);
+  const [showRemovedCustomers,setShowRemovedCustomers]=useState(false);
+  const [editingCustomer,setEditingCustomer]=useState<CustomerEntry|null>(null);
+  const [customerNameInput,setCustomerNameInput]=useState("");
   const [promotions,setPromotions]=useState<Promotion[]>([]);
   const [authenticated,setAuthenticated]=useState(false);
   const [account,setAccount]=useState<{email:string;uid:string;isAnonymous:boolean}|null>(null);
@@ -137,7 +149,19 @@ export default function AdminDashboard() {
     const unsubSocial=onSnapshot(doc(db(),"settings","social"),
       snap=>{const parsed=socialLinksSchema.safeParse(snap.data()??emptySocialLinks);if(parsed.success)setSocial(parsed.data);setSocialRulesError(false);},
       ()=>setSocialRulesError(true));
-    return()=>{unsubOrders();unsubProducts();unsubPromos();unsubSocial();};
+    const unsubCustomerProfiles=onSnapshot(collection(db(),"customerProfiles"),
+      snap=>{
+        const next:Record<string,CustomerProfile>={};
+        snap.docs.forEach(record=>{
+          const data=record.data();
+          if(typeof data.name==="string"&&typeof data.phone==="string"&&typeof data.archived==="boolean"){
+            next[record.id]={name:data.name,phone:data.phone,archived:data.archived};
+          }
+        });
+        setCustomerProfiles(next);setCustomerProfilesError(false);
+      },
+      ()=>setCustomerProfilesError(true));
+    return()=>{unsubOrders();unsubProducts();unsubPromos();unsubSocial();unsubCustomerProfiles();};
   },[authenticated]);
   async function enableAlerts(){
     if(typeof window==="undefined"||!("Notification" in window)){setError("Este navegador no permite notificaciones.");return;}
@@ -257,6 +281,52 @@ export default function AdminDashboard() {
     try{await updateDoc(doc(db(),"products",product.id),{active:!product.active,updatedAt:serverTimestamp()});}
     catch(e){setError(readableError(e));}
   }
+  async function deleteProduct(product:Product){
+    if(saving)return;
+    if(!window.confirm("¿Eliminar definitivamente «"+product.name+"» del catálogo? Esta acción no puede deshacerse. Los pedidos históricos conservarán los nombres y precios registrados."))return;
+    setSaving(true);setError("");
+    try{
+      await deleteDoc(doc(db(),"products",product.id));
+      const media=productPhotos(product);
+      const outcomes=await Promise.allSettled(media.map(async url=>{
+        let reference:ReturnType<typeof storageRef>;
+        try{reference=storageRef(getStorage(firebaseApp()),url);}catch{return;}
+        if(!reference.fullPath.startsWith("catalog/products/"+product.id+"/"))return;
+        await deleteObject(reference);
+      }));
+      if(outcomes.some(result=>result.status==="rejected")){
+        setError("Producto eliminado. Algunas fotos antiguas no se pudieron retirar de Firebase Storage; puedes limpiarlas posteriormente.");
+      }
+    }catch(e){setError(readableError(e)+". Si indica permisos, publica firestore.rules en Firebase.");}
+    finally{setSaving(false);}
+  }
+  function editCustomer(customer:CustomerEntry){
+    setEditingCustomer(customer);setCustomerNameInput(customer.name);setError("");
+  }
+  async function saveCustomer(event:React.FormEvent<HTMLFormElement>){
+    event.preventDefault();
+    if(!editingCustomer||saving)return;
+    const name=customerNameInput.trim().replace(/\s+/g," ");
+    if(name.length<2||name.length>100){setError("El nombre debe contener entre 2 y 100 caracteres.");return;}
+    setSaving(true);setError("");
+    try{
+      await setDoc(doc(db(),"customerProfiles",editingCustomer.id),
+        {name,phone:editingCustomer.id,archived:false,updatedAt:serverTimestamp()});
+      setEditingCustomer(null);
+    }catch(e){setError(readableError(e)+". Verifica que las reglas de clientes estén publicadas en Firebase.");}
+    finally{setSaving(false);}
+  }
+  async function setCustomerArchived(customer:CustomerEntry,archived:boolean){
+    if(saving)return;
+    if(archived&&!window.confirm("¿Eliminar a «"+customer.name+"» del listado de clientes? Sus pedidos se conservarán como historial y podrás restaurarlo en «Mostrar eliminados»."))return;
+    setSaving(true);setError("");
+    try{
+      await setDoc(doc(db(),"customerProfiles",customer.id),{
+        name:customer.name,phone:customer.id,archived,updatedAt:serverTimestamp()
+      });
+    }catch(e){setError(readableError(e)+". Verifica que las reglas de clientes estén publicadas en Firebase.");}
+    finally{setSaving(false);}
+  }
   async function savePromotion(event:React.FormEvent<HTMLFormElement>){
     event.preventDefault();if(!editingPromo)return;
     setSaving(true);setError("");
@@ -290,7 +360,27 @@ export default function AdminDashboard() {
   const deliveredValue=validOrders.filter(o=>o.status==="Entregado").reduce((sum,o)=>sum+o.total,0);
   const pending=allOrders.filter(o=>!["Entregado","Cancelado"].includes(o.status)).length;
   const newOrders=allOrders.filter(o=>o.status==="Nuevo").length;
-  const customers=Array.from(new Map(allOrders.map(o=>[o.customer.phone,o.customer])).values());
+  const customers=useMemo<CustomerEntry[]>(()=>{
+    const entries=new Map<string,CustomerEntry>();
+    for(const order of allOrders){
+      const id=customerKey(order.customer.phone);
+      if(!id)continue;
+      const entry=entries.get(id);
+      if(entry){
+        entry.orderCount+=1;
+        if(order.status!=="Cancelado")entry.requestedAmount+=order.total;
+      }else{
+        entries.set(id,{id,name:order.customer.name,phone:order.customer.phone,archived:false,orderCount:1,
+          requestedAmount:order.status==="Cancelado"?0:order.total});
+      }
+    }
+    return [...entries.values()].map(entry=>{
+      const profile=customerProfiles[entry.id];
+      return profile?{...entry,name:profile.name,archived:profile.archived}:entry;
+    });
+  },[allOrders,customerProfiles]);
+  const visibleCustomers=customers.filter(customer=>customer.archived===showRemovedCustomers);
+  const activeCustomerCount=customers.filter(customer=>!customer.archived).length;
   const chartData=useMemo(()=>{
     const days=Array.from({length:7},(_,i)=>{const day=new Date();day.setHours(0,0,0,0);day.setDate(day.getDate()-(6-i));return day;});
     return days.map(day=>({day:day.toLocaleDateString("es-NI",{weekday:"short"}),ventas:orders.filter(o=>o.status!=="Cancelado"&&new Date(o.createdAt).toDateString()===day.toDateString()).reduce((sum,o)=>sum+o.total,0)}));
@@ -328,13 +418,44 @@ export default function AdminDashboard() {
       <div className="admin-content">
       {error&&<div className="admin-error" role="alert">{error}<button onClick={()=>setError("")}><X size={17}/></button></div>}
       {view==="resumen"&&<><div className="admin-page-title"><div><span className="eyebrow">CENTRO DE CONTROL</span><h1>Un gran día comienza <em>aquí.</em></h1><p>Esto es lo que está pasando en tu negocio.</p></div><span className="today-tag"><CalendarDays size={16}/>{new Date().toLocaleDateString("es-NI",{day:"numeric",month:"long",year:"numeric"})}</span></div>
-        <div className="kpi-grid"><div className="kpi-card"><span>Valor de pedidos entregados <Wallet size={20}/></span><strong>{currency(deliveredValue)}</strong><small>No acredita el pago recibido</small></div><div className="kpi-card"><span>Pedidos en proceso <ClipboardList size={20}/></span><strong>{pending}</strong><small>{newOrders} nuevos por confirmar</small></div><div className="kpi-card"><span>Clientes <Users size={20}/></span><strong>{customers.length}</strong><small>De las solicitudes cargadas</small></div><div className="kpi-card"><span>Productos activos <Package size={20}/></span><strong>{products.filter(p=>p.active).length}</strong><small>Disponibles en el catálogo</small></div></div>
+        <div className="kpi-grid"><div className="kpi-card"><span>Valor de pedidos entregados <Wallet size={20}/></span><strong>{currency(deliveredValue)}</strong><small>No acredita el pago recibido</small></div><div className="kpi-card"><span>Pedidos en proceso <ClipboardList size={20}/></span><strong>{pending}</strong><small>{newOrders} nuevos por confirmar</small></div><div className="kpi-card"><span>Clientes <Users size={20}/></span><strong>{activeCustomerCount}</strong><small>De las solicitudes cargadas</small></div><div className="kpi-card"><span>Productos activos <Package size={20}/></span><strong>{products.filter(p=>p.active).length}</strong><small>Disponibles en el catálogo</small></div></div>
         <div className="admin-overview-grid"><section className="admin-panel chart-panel"><div className="panel-header"><div><span className="eyebrow">PULSO COMERCIAL</span><h2>Valor de solicitudes de la semana</h2></div><span className="panel-chip"><TrendingUp size={15}/> Últimos 7 días</span></div><div className="chart-wrap"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData} margin={{top:18,right:10,left:10,bottom:0}}><defs><linearGradient id="sales" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#bc677e" stopOpacity={.28}/><stop offset="100%" stopColor="#bc677e" stopOpacity={0}/></linearGradient></defs><CartesianGrid stroke="#efe8e3" vertical={false}/><XAxis dataKey="day" tickLine={false} axisLine={false} tick={{fill:"#8f8482",fontSize:12}}/><Tooltip formatter={(v)=>currency(Number(v))} contentStyle={{borderRadius:14,border:"1px solid #f0e5e0"}}/><Area type="monotone" dataKey="ventas" stroke="#9d4565" strokeWidth={3} fill="url(#sales)"/></AreaChart></ResponsiveContainer></div></section><section className="admin-panel attention-panel"><div className="panel-header"><div><span className="eyebrow">A LA VISTA</span><h2>Por atender</h2></div><span className="attention-icon">✳</span></div><strong className="attention-number">{pending.toString().padStart(2,"0")}</strong><p>pedidos necesitan seguimiento</p><button className="button-dark wide" onClick={()=>navigate("pedidos")}>Gestionar pedidos <ArrowRight size={17}/></button></section></div>
         <section className="admin-panel"><div className="panel-header"><div><span className="eyebrow">MOVIMIENTO RECIENTE</span><h2>Últimos pedidos</h2></div><button className="text-link" onClick={()=>navigate("pedidos")}>Ver todos <ArrowRight size={16}/></button></div><OrderTable orders={orders.slice(0,5)} onSelect={setDetail}/></section></>}
       {view==="pedidos"&&<><div className="admin-page-title"><div><span className="eyebrow">OPERACIÓN DIARIA</span><h1>Gestión de <em>pedidos.</em></h1><p>Del primer antojo hasta la entrega.</p></div><span className="today-tag">{allOrders.length} pedidos cargados</span></div><div className="admin-panel"><div className="list-toolbar"><label className="admin-search"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar pedido o cliente" /></label><button className="toolbar-refresh" onClick={exportOrdersCsv}>Exportar CSV (cargados)</button><button className="toolbar-refresh" onClick={()=>void refresh()}>Actualizar <ArrowRight size={16}/></button></div><OrderTable orders={displayedOrders} onSelect={setDetail}/>{hasMoreOrders&&<button type="button" className="admin-more-orders" disabled={loadingMoreOrders} onClick={()=>void loadOlderOrders()}>{loadingMoreOrders?"Cargando...":"Cargar 150 pedidos anteriores"}</button>}{allOrders.length>=150&&<small className="admin-history-note">Las estadísticas muestran los pedidos cargados.</small>}</div></>}
-      {view==="productos"&&<><div className="admin-page-title"><div><span className="eyebrow">TU VITRINA DIGITAL</span><h1>Productos con <em>personalidad.</em></h1><p>Tu catálogo, siempre al día.</p></div><button className="button-dark" onClick={()=>openProductEditor({...emptyProduct},true)}><Plus size={17}/> Nuevo producto</button></div><div className="admin-panel"><div className="list-toolbar"><label className="admin-search"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar producto" /></label><span className="list-counter">{products.length} productos</span></div><div className="admin-products">{displayedProducts.map(p=><div className="admin-product" key={p.id}><img src={p.image} alt={p.name}/><div className="admin-product-name"><strong>{p.name}</strong><span>{p.category}</span></div><span className="admin-product-price">{currency(p.price)}</span><span className={"stock-badge "+(p.stock===0?"out":"")}>{p.stock===null?"Sin límite":p.stock+" unidades"}</span><button className={"visibility-toggle "+(p.active?"on":"")} onClick={()=>void toggleProduct(p)} aria-label={p.active?"Ocultar producto":"Mostrar producto"} title={p.active?"Visible":"Oculto"}><span/></button><button className="icon-button" onClick={()=>openProductEditor(p,false)} aria-label={"Editar "+p.name}><Pencil size={17}/></button></div>)}{displayedProducts.length===0&&<p className="admin-empty">No hay productos para mostrar.</p>}</div></div></>}
+      {view==="productos"&&<><div className="admin-page-title"><div><span className="eyebrow">TU VITRINA DIGITAL</span><h1>Productos con <em>personalidad.</em></h1><p>Tu catálogo, siempre al día.</p></div><button className="button-dark" onClick={()=>openProductEditor({...emptyProduct},true)}><Plus size={17}/> Nuevo producto</button></div><div className="admin-panel"><div className="list-toolbar"><label className="admin-search"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar producto" /></label><span className="list-counter">{products.length} productos</span></div><div className="admin-products">{displayedProducts.map(p=><div className="admin-product" key={p.id}><img src={p.image} alt={p.name}/><div className="admin-product-name"><strong>{p.name}</strong><span>{p.category}</span></div><span className="admin-product-price">{currency(p.price)}</span><span className={"stock-badge "+(p.stock===0?"out":"")}>{p.stock===null?"Sin límite":p.stock+" unidades"}</span><button className={"visibility-toggle "+(p.active?"on":"")} onClick={()=>void toggleProduct(p)} aria-label={p.active?"Ocultar producto":"Mostrar producto"} title={p.active?"Visible":"Oculto"}><span/></button><button className="icon-button" onClick={()=>openProductEditor(p,false)} aria-label={"Editar "+p.name} title="Editar producto" disabled={saving}><Pencil size={17}/></button><button type="button" className="icon-button admin-product-delete" onClick={()=>void deleteProduct(p)} aria-label={"Eliminar "+p.name} title="Eliminar producto definitivamente" disabled={saving}><Trash2 size={17}/></button></div>)}{displayedProducts.length===0&&<p className="admin-empty">No hay productos para mostrar.</p>}</div></div></>}
       {view==="promociones"&&<><div className="admin-page-title"><div><span className="eyebrow">CAMPAÑAS Y DESTACADOS</span><h1>Promociones que <em>conectan.</em></h1><p>Gestiona los destacados visibles en la tienda.</p></div><button className="button-dark" onClick={()=>{setEditingPromo({...emptyPromo});setNewPromo(true);setPendingPromoImage(null);setError("");}}><Plus size={17}/> Nueva promoción</button></div><div className="admin-panel"><div className="promo-admin-grid">{promotions.map(p=><article className="promo-admin-card" key={p.id}><img src={p.image} alt={p.title}/><div><span className="eyebrow">{p.eyebrow}</span><h3>{p.title}</h3><p>{p.subtitle}</p><div className="promo-admin-actions"><span className={"status "+(p.active?"status-entregado":"status-cancelado")}>{p.active?"Visible":"Oculta"}</span><button onClick={()=>void togglePromotion(p)}>{p.active?"Ocultar":"Publicar"}</button><button onClick={()=>{setEditingPromo({...p});setNewPromo(false);setPendingPromoImage(null);setError("");}}><Pencil size={15}/> Editar</button></div></div></article>)}{promotions.length===0&&<div className="admin-empty">Crea tu primera campaña para mostrarla en la tienda.</div>}</div></div></>}
-      {view==="clientes"&&<><div className="admin-page-title"><div><span className="eyebrow">COMUNIDAD DOLCE</span><h1>Personas que nos <em>eligen.</em></h1><p>Conoce a tus clientes y sus pedidos.</p></div><span className="today-tag">{customers.length} clientes</span></div><div className="admin-panel"><div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Cliente</th><th>Teléfono</th><th>Pedidos</th><th>Valor solicitado (no cancelado)</th></tr></thead><tbody>{customers.map(customer=>{const customerOrders=allOrders.filter(o=>o.customer.phone===customer.phone);return <tr key={customer.phone}><td><strong>{customer.name}</strong></td><td>{customer.phone}</td><td>{customerOrders.length}</td><td>{currency(customerOrders.filter(o=>o.status!=="Cancelado").reduce((sum,o)=>sum+o.total,0))}</td></tr>;})}</tbody></table>{customers.length===0&&<div className="admin-empty">Todavía no hay clientes registrados.</div>}</div></div></>}
+      {view==="clientes"&&<>
+        <div className="admin-page-title">
+          <div><span className="eyebrow">COMUNIDAD DOLCE</span><h1>Personas que nos <em>eligen.</em></h1><p>Gestiona los nombres y el directorio sin alterar los pedidos históricos.</p></div>
+          <span className="today-tag">{activeCustomerCount} clientes</span>
+        </div>
+        <div className="admin-panel">
+          <div className="list-toolbar admin-clients-toolbar">
+            <span className="list-counter">{showRemovedCustomers?"Clientes eliminados del listado":"Directorio de clientes"}</span>
+            <button type="button" className="toolbar-refresh" onClick={()=>setShowRemovedCustomers(v=>!v)}>
+              {showRemovedCustomers?"Ver clientes activos":"Mostrar eliminados"}
+            </button>
+          </div>
+          {customerProfilesError&&<p className="admin-client-warning" role="alert">Para editar o eliminar clientes debes publicar las reglas actualizadas de Firestore en Firebase. Los pedidos siguen disponibles.</p>}
+          <div className="admin-table-wrap">
+            <table className="admin-table"><thead><tr><th>Cliente</th><th>Teléfono</th><th>Pedidos</th><th>Valor solicitado (no cancelado)</th><th>Acciones</th></tr></thead>
+              <tbody>{visibleCustomers.map(customer=><tr key={customer.id}>
+                <td><strong>{customer.name}</strong></td><td>{customer.phone}</td><td>{customer.orderCount}</td><td>{currency(customer.requestedAmount)}</td>
+                <td><div className="admin-client-actions">
+                  {customer.archived?
+                    <button type="button" className="admin-client-action" onClick={()=>void setCustomerArchived(customer,false)} disabled={saving||customerProfilesError}><Check size={16}/> Restaurar</button>:
+                    <>
+                      <button type="button" className="admin-client-action" onClick={()=>editCustomer(customer)} disabled={saving||customerProfilesError}><Pencil size={15}/> Editar</button>
+                      <button type="button" className="admin-client-action danger" onClick={()=>void setCustomerArchived(customer,true)} disabled={saving||customerProfilesError}><Trash2 size={15}/> Eliminar</button>
+                    </>}
+                </div></td>
+              </tr>)}</tbody>
+            </table>
+            {!visibleCustomers.length&&<div className="admin-empty">{showRemovedCustomers?"No hay clientes eliminados.":"No hay clientes para mostrar."}</div>}
+          </div>
+          <p className="admin-clients-note">Eliminar retira al cliente del directorio, pero conserva sus pedidos y cifras históricas. Puedes restaurarlo desde «Mostrar eliminados».</p>
+        </div>
+      </>}
       {view==="redes"&&<><div className="admin-page-title"><div><span className="eyebrow">COMUNIDAD Y CONTACTO</span><h1>Redes de <em>DOLCE.</em></h1><p>Administra los enlaces que abrirán los iconos de la tienda pública.</p></div></div>
         <form className="admin-panel social-settings-panel" onSubmit={saveSocial}>
           <div className="social-settings-heading"><div><h2>Enlaces oficiales</h2><p>Los campos pueden quedar vacíos. Su icono aparecerá sin enlace hasta que lo configures.</p></div><span>4 canales</span></div>
@@ -345,6 +466,19 @@ export default function AdminDashboard() {
         </form>
       </>}
       </div><div className="admin-bottom-legal"><a href="/legales" target="_blank" rel="noopener noreferrer">Legales y privacidad</a><span>Desarrollado por <a href="https://xarcon-creative.vercel.app/" target="_blank" rel="noopener noreferrer">XARCON</a></span></div></div>
+    {editingCustomer&&<div className="admin-modal-overlay" onMouseDown={event=>{if(event.target===event.currentTarget&&!saving)setEditingCustomer(null);}}>
+      <form className="admin-modal admin-client-modal" onSubmit={saveCustomer}>
+        <div className="modal-title"><div><span className="eyebrow">DIRECTORIO DOLCE</span><h2>Editar nombre del cliente</h2></div>
+          <button type="button" aria-label="Cerrar" disabled={saving} onClick={()=>setEditingCustomer(null)}><X size={21}/></button>
+        </div>
+        <p>Teléfono: <strong>{editingCustomer.phone}</strong></p>
+        <label>Nombre del cliente<input required minLength={2} maxLength={100} autoFocus value={customerNameInput}
+          onChange={event=>setCustomerNameInput(event.target.value)} /></label>
+        <p className="admin-clients-note">Este nombre se mostrará en el directorio. Los nombres guardados en pedidos anteriores no se modifican.</p>
+        {error&&<div className="form-error" role="alert">{error}</div>}
+        <button className="button-dark wide" type="submit" disabled={saving}>{saving?"Guardando...":"Guardar nombre"}</button>
+      </form>
+    </div>}
     {detail&&<div className="admin-modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setDetail(null);}}><div className="admin-modal order-modal"><div className="modal-title"><div><span className="eyebrow">DETALLES DEL PEDIDO</span><h2>Pedido #{detail.id.slice(0,12)}</h2></div><button onClick={()=>setDetail(null)} aria-label="Cerrar"><X size={22}/></button></div><div className="order-detail-fields"><div><small>Cliente</small><strong>{detail.customer.name}</strong></div><div><small>Contacto</small><strong>{detail.customer.phone}</strong></div><div><small>Entrega</small><strong>{detail.customer.method}</strong></div><div><small>Fecha solicitada</small><strong>{detail.customer.requestedDate||"Por confirmar"}</strong></div></div>{detail.customer.address&&<p className="detail-note"><strong>Dirección:</strong> {detail.customer.address}</p>}<div className="detail-lines">{detail.items.map(item=><div key={item.productId}><span>{item.quantity} × {item.name}</span><strong>{currency(item.quantity*item.price)}</strong></div>)}<div className="detail-total"><span>Productos sin envío</span><strong>{currency(detail.total)}</strong></div></div><p className="detail-note">La solicitud no implica cobro en línea. Confirma el pago y la entrega por WhatsApp.</p>{orderWhatsApp(detail)&&<a className="admin-order-whatsapp" href={orderWhatsApp(detail)||"#"} target="_blank" rel="noopener noreferrer"><MessageCircle size={17}/> Contactar por WhatsApp <ExternalLink size={15}/></a>}{detail.notes&&<p className="detail-note"><strong>Indicaciones:</strong> {detail.notes}</p>}<label className="status-picker">Estado actual<select value={detail.status} onChange={e=>void changeStatus(detail,e.target.value as OrderStatus)} disabled={saving}>{stateOptions.map(s=><option key={s}>{s}</option>)}</select></label><small className="modal-caption">El cambio se guarda inmediatamente. El inventario no se descuenta ni se reserva automáticamente: verifica las existencias y actualiza los productos antes de confirmar.</small></div></div>}
     {editing&&<div className="admin-modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget&&!saving)closeProductEditor();}}>
       <form className="admin-modal product-modal" onSubmit={saveProduct}>

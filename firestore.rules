@@ -64,7 +64,7 @@ service cloud.firestore {
     match /products/{productId} {
       allow get, list: if isOwner() || resource.data.active == true;
       allow create, update: if isOwner() && productData(request.resource.data);
-      allow delete: if false;
+      allow delete: if isOwner();
     }
     match /promotions/{promotionId} {
       allow get, list: if isOwner() || resource.data.active == true;
@@ -76,6 +76,22 @@ service cloud.firestore {
       allow list, delete: if false;
       allow create, update: if settingId == 'social'
         && isOwner() && socialData(request.resource.data);
+    }
+    // Correcciones de nombres y exclusión del directorio: no alteran pedidos históricos.
+    function customerProfileData(d, key) {
+      return d.keys().hasAll(['name','phone','archived','updatedAt'])
+        && d.keys().hasOnly(['name','phone','archived','updatedAt'])
+        && d.name is string && d.name.size() >= 2 && d.name.size() <= 100
+        && d.phone is string && d.phone == key
+        && d.phone.matches('[0-9]{8,15}')
+        && d.archived is bool
+        && d.updatedAt == request.time;
+    }
+    match /customerProfiles/{customerKey} {
+      allow get, list: if isOwner();
+      allow create, update: if isOwner()
+        && customerProfileData(request.resource.data, customerKey);
+      allow delete: if false;
     }
     // Colección obsoleta; los permisos ya no dependen de documentos staff.
     match /staff/{uid} {
