@@ -361,3 +361,33 @@ img{display:block;max-width:100%}
 .social-public-links .social-unlinked{opacity:.46;cursor:default;border-style:dashed}
 @media(max-width:770px){.social-follow{flex-direction:column;align-items:stretch;gap:24px;padding-top:60px;padding-bottom:60px}.social-public-links{width:100%;min-width:0}}
 @media(max-width:430px){.photo-editor-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.social-public-links{grid-template-columns:repeat(2,minmax(0,1fr))}.social-public-links a,.social-public-links>span{gap:7px;font-size:10px;padding:13px 10px}.social-public-links svg{width:18px;height:18px}.social-link-field{gap:8px;padding:10px}.social-link-icon{width:35px;height:35px}.social-settings-heading{flex-direction:column}}
+
+/* DOLCE: información legal y firma del desarrollador */
+.footer-policy{display:flex;gap:12px 24px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.15);padding:19px 0;font-size:12px;line-height:1.6}
+.footer-policy a{font-weight:650;text-decoration:underline;text-underline-offset:3px}
+.footer-credit{border-top:1px solid rgba(255,255,255,.15);padding:18px 0 22px;text-align:center;font-size:12px;letter-spacing:.025em}
+.footer-credit a{font-weight:800;letter-spacing:.11em;text-decoration:underline;text-underline-offset:4px}
+.checkout-legal{display:flex;gap:12px;align-items:flex-start;font-size:12px;line-height:1.6;margin:12px 0;color:var(--ink)}
+.checkout-legal input{width:17px;height:17px;flex:0 0 17px;margin-top:2px;accent-color:var(--wine)}
+.checkout-legal a{text-decoration:underline;text-underline-offset:3px;font-weight:700}
+.legal-page{min-height:100vh;background:linear-gradient(180deg,#fffaf5,#fbf4ed);color:var(--ink);padding:42px 22px 90px}
+.legal-shell{max-width:880px;margin:0 auto}
+.legal-back{display:inline-flex;gap:8px;align-items:center;color:var(--wine);font-size:14px;font-weight:650;margin-bottom:55px}
+.legal-hero{border-bottom:1px solid var(--line);padding-bottom:32px;margin-bottom:32px}
+.legal-kicker{font-weight:700;letter-spacing:.18em;color:var(--berry);font-size:11px;text-transform:uppercase}
+.legal-hero h1{font-family:var(--font-display),serif;font-size:clamp(38px,7vw,68px);line-height:1.12;margin:12px 0 18px}
+.legal-hero p{font-size:16px;line-height:1.8;max-width:670px;color:#66555b}
+.legal-updated{display:block;margin-top:18px;font-size:12px;color:#87767b}
+.legal-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.legal-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:26px 28px;box-shadow:0 12px 32px rgba(73,35,45,.035)}
+.legal-card h2{font-size:18px;line-height:1.35;font-weight:750;margin:0 0 14px}
+.legal-card p,.legal-card li{font-size:14px;line-height:1.8;color:#5f5155;margin:0 0 12px}
+.legal-card p:last-child{margin-bottom:0}
+.legal-card a{font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.legal-card.legal-feature{grid-column:1/-1;background:#fff4ec}
+.legal-end{font-size:12px;line-height:1.7;color:#77656b;margin-top:26px}
+.legal-credit{text-align:center;border-top:1px solid var(--line);padding-top:26px;margin-top:34px;font-size:12px}
+.legal-credit a{font-weight:800;color:var(--wine);text-decoration:underline;text-underline-offset:3px}
+.admin-bottom-legal{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px;padding:16px 25px 24px;font-size:12px;color:#81757a}
+.admin-bottom-legal a{text-decoration:underline;text-underline-offset:3px}
+@media(max-width:650px){.legal-grid{grid-template-columns:1fr}.legal-card{padding:21px}.legal-hero{margin-bottom:20px}.legal-back{margin-bottom:35px}.legal-page{padding-top:27px}.footer-policy{align-items:flex-start;flex-direction:column}}

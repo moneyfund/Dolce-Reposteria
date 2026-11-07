@@ -20,7 +20,7 @@ export const orderSchema = z.object({
     method: z.enum(["Retiro", "Entrega"]),
     requestedDate: z.string().max(30).optional(),
   }),
-  items: z.array(z.object({ productId: z.string().min(1).max(80), quantity: z.number().int().min(1).max(30) })).min(1).max(30),
+  items: z.array(z.object({ productId: z.string().min(2).max(80), quantity: z.number().int().min(1).max(10) })).min(1).max(5),
   notes: z.string().trim().max(500),
 }).superRefine((data,ctx) => {
   if(data.customer.method === "Entrega" && data.customer.address.length < 8) ctx.addIssue({ code: "custom", message: "Indica una dirección de entrega", path: ["customer","address"] });
