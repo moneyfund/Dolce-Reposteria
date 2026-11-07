@@ -7,9 +7,9 @@ Plataforma de tienda pública y panel DOLCE Manager. Next.js, React, TypeScript,
 - **Tienda:** consulta en tiempo real los productos `active=true` y promociones públicas. El carrito se conserva en el navegador. El checkout valida nombres, precios y existencias desde Firestore antes de escribir la solicitud.
 - **Autenticación de clientes:** Firebase Authentication anónima permite comprar sin crear contraseña. Cada pedido se asocia al UID temporal del cliente. Hay que habilitar **Anonymous** en Firebase Console → Authentication → Sign-in method. Google debe permanecer habilitado para el personal de DOLCE.
 - **Pedidos reales:** `orders/{id}` recibe `ownerUid`, `customer`, `items`, `subtotal`, `deliveryFee`, `total`, `notes`, `status=Nuevo` y `createdAt=serverTimestamp()`. La regla valida los precios contra los documentos originales de `products`; **no confía en el subtotal del navegador**. Máximo 5 productos distintos por pedido y 10 unidades de cada uno.
-- **Manager:** inicio de sesión con Google, autorizado exclusivamente para `norvingarcia220@gmail.com` con correo verificado y proveedor Google. La aplicación y las reglas de Firestore/Storage comprueban esa identidad mediante el ID token firmado por Firebase; **no existe registro `staff` ni alta manual de UID**. Escucha `orders`, `products` y `promotions` en tiempo real.
+- **Manager:** inicio de sesión con Google, autorizado actualmente para `norvingarcia220@gmail.com` con correo verificado y proveedor Google. La aplicación y las reglas de Firestore/Storage comprueban esa identidad mediante el ID token firmado por Firebase; **no existe registro `staff` ni alta manual de UID**. Escucha `orders`, `products` y `promotions` en tiempo real.
 - **Inventario:** el checkout verifica las existencias pero **no reserva ni descuenta stock automáticamente**. El equipo debe confirmar disponibilidad y actualizar el inventario al gestionar pedidos; evitar prometer una reserva automática antes de implementar transacciones de inventario.
-- **Storage:** mantiene los permisos de `storage.rules` para fotos públicas de catálogo/promociones y adjuntos privados. La carga de fotos todavía usa URL HTTPS, no hay interfaz de subida directa.
+- **Storage:** mantiene los permisos de `storage.rules` para fotos públicas de catálogo/promociones y adjuntos privados. Los productos admiten hasta ocho fotografías y las promociones una imagen, subidas desde el dispositivo o con un enlace HTTPS.
 
 ## Configuración inicial
 
@@ -61,3 +61,16 @@ La validación de precio, cantidades, identidad y rol se aplica con Security Rul
 ## Contexto académico
 
 Implementación de la propuesta de transferencia digital para la tesis UNAN de DOLCE Pastelería. Una aplicación operativa no demuestra por sí misma efectos estadísticos sobre ventas o posicionamiento: se requiere medición posterior.
+
+## Entrega operativa y página legal (noviembre de 2026)
+
+- Rutas: tienda `/`, políticas `/legales`, gestor `/admin`. La tienda y el panel muestran el crédito de XARCON con enlace al sitio del desarrollador.
+- El sitio registra **solicitudes de pedido**, no cobra. El personal confirma primero por WhatsApp y coordina después efectivo o transferencia. Costos de envío sujetos a cotización.
+- El checkout exige aceptar las condiciones y alinea el carrito con los límites de Firestore: máximo cinco productos distintos y diez unidades por producto. El carrito se sincroniza con el catálogo publicado para reflejar cambios de precios, disponibilidad y fotografías.
+- DOLCE Manager dispone de avisos del navegador **solo si la pestaña está abierta y el usuario concede permiso**. No son push en segundo plano. Un botón de WhatsApp en cada detalle de pedido permite contactar al cliente; utiliza el número informado en la solicitud.
+- El gestor carga inicialmente hasta 150 pedidos y permite cargar bloques históricos de 150. Las métricas reflejan los pedidos consultados y **un estado Entregado no demuestra que se haya cobrado**: las cifras muestran valores nominales.
+- Se pueden subir imágenes locales de promociones a Firebase Storage. Esto requiere que las reglas `storage.rules` estén realmente desplegadas en Firebase.
+- **El inventario continúa sin reserva ni descuento automáticos.** El propietario debe confirmar existencias antes de aceptar, actualizar el stock manualmente y evitar prometer una reserva inmediata.
+- **Accesos:** conservar el correo del desarrollador hasta recibir el correo exacto del propietario. La incorporación exige modificar de manera coordinada `components/admin-dashboard.tsx`, `firestore.rules` y `storage.rules`. Editar solo las reglas no basta, ya que el cliente administrativo también valida el correo. No publicar permisos generales.
+- El deploy de Vercel **no despliega las reglas de Firebase**: usar `firebase deploy --only firestore:rules,storage --project dolce-reposteria` con credenciales autorizadas.
+- Para una escala superior añadir monitorización de consumo, controles antiabuso, una integración de App Check completa y notificaciones externas o push. La página de condiciones requiere una última revisión comercial y, si se formalizan condiciones especiales, asesoramiento legal local.

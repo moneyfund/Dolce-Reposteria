@@ -391,3 +391,13 @@ img{display:block;max-width:100%}
 .admin-bottom-legal{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px;padding:16px 25px 24px;font-size:12px;color:#81757a}
 .admin-bottom-legal a{text-decoration:underline;text-underline-offset:3px}
 @media(max-width:650px){.legal-grid{grid-template-columns:1fr}.legal-card{padding:21px}.legal-hero{margin-bottom:20px}.legal-back{margin-bottom:35px}.legal-page{padding-top:27px}.footer-policy{align-items:flex-start;flex-direction:column}}
+
+/* DOLCE Manager: avisos, historial y contacto al cliente */
+.admin-alert-button{display:inline-flex;align-items:center;gap:7px;border:1px solid #e8d8dc;background:#fff;border-radius:999px;padding:7px 11px;color:#653f4d;font-size:12px;font-weight:650;white-space:nowrap}
+.admin-alert-button:hover{background:#fff4f6}
+.admin-more-orders{display:block;margin:20px auto;border:1px solid #d7bdc6;color:#612b3e;border-radius:12px;padding:11px 18px;font-weight:650;background:white}
+.admin-more-orders:hover{background:#fff5f7}
+.admin-history-note{display:block;text-align:center;color:#81757a;padding:0 0 18px}
+.admin-order-whatsapp{display:inline-flex;align-items:center;gap:8px;border-radius:12px;padding:11px 15px;margin:8px 0 14px;background:#e3f6e9;color:#185f38;font-size:13px;font-weight:750}
+.admin-order-whatsapp:hover{background:#c9ecd5}
+@media(max-width:640px){.admin-alert-button{padding:7px 10px;font-size:11px}}
